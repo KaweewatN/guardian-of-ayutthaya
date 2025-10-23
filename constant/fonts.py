@@ -4,6 +4,8 @@ Centralized font management for the game
 """
 import pygame
 
+DEFAULT_FONT = 'Inknut Antiqua'
+
 
 class Fonts:
     """Manages all game fonts"""
@@ -12,17 +14,17 @@ class Fonts:
     pygame.font.init()
     
     # Button fonts
-    BUTTON_FONT = pygame.font.SysFont('Times New Roman', 48, bold=True)
-    BUTTON_FONT_LARGE = pygame.font.SysFont('Times New Roman', 56, bold=True)
-    BUTTON_FONT_SMALL = pygame.font.SysFont('Times New Roman', 36, bold=True)
+    BUTTON_FONT = pygame.font.SysFont(DEFAULT_FONT, 48, bold=True)
+    BUTTON_FONT_LARGE = pygame.font.SysFont(DEFAULT_FONT, 56, bold=True)
+    BUTTON_FONT_SMALL = pygame.font.SysFont(DEFAULT_FONT, 36, bold=True)
     
     # Title fonts
-    TITLE_FONT = pygame.font.SysFont('Times New Roman', 72, bold=True)
-    SUBTITLE_FONT = pygame.font.SysFont('Times New Roman', 48, bold=False)
+    TITLE_FONT = pygame.font.SysFont(DEFAULT_FONT, 72, bold=True)
+    SUBTITLE_FONT = pygame.font.SysFont(DEFAULT_FONT, 48, bold=False)
     
     # Text fonts
-    TEXT_FONT = pygame.font.SysFont('Times New Roman', 24, bold=False)
-    TEXT_FONT_BOLD = pygame.font.SysFont('Times New Roman', 24, bold=True)
+    TEXT_FONT = pygame.font.SysFont(DEFAULT_FONT, 24, bold=False)
+    TEXT_FONT_BOLD = pygame.font.SysFont(DEFAULT_FONT, 24, bold=True)
     
     @staticmethod
     def get_button_font():
