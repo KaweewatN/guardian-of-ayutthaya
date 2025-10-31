@@ -45,7 +45,8 @@ class Stories:
         self.current_story = 1
         self.story_images = {}
         self.last_story_change = pygame.time.get_ticks()
-        
+        self.finished = False
+
         # Load story images
         self.load_story_images()
     
@@ -89,11 +90,13 @@ class Stories:
     
     def fade_transition(self, from_story, to_story, clock):
         """Create a fade transition between two stories"""
+        # If to_story is None, we'll fade out to black
         for alpha in range(0, 256, self.fade_speed):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return False
-                elif event.type == pygame.K_ESCAPE:
+                # treat ESC key as a request to cancel
+                elif event.type == pygame.KEYDOWN and getattr(event, 'key', None) == pygame.K_ESCAPE:
                     return False
             
             # Draw old story fading out
@@ -104,8 +107,8 @@ class Stories:
                 img_rect = img.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
                 self.screen.blit(img, img_rect)
             
-            # Draw new story fading in
-            if to_story in self.story_images:
+            # Draw new story fading in (or nothing if to_story is None)
+            if to_story is not None and to_story in self.story_images:
                 img = self.story_images[to_story].copy()
                 img.set_alpha(alpha)
                 img_rect = img.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
@@ -118,8 +121,20 @@ class Stories:
     
     def advance_story(self, clock):
         """Advance to the next story"""
-        next_story = self.current_story + 1 if self.current_story < self.max_stories else 1
-        
+        # If already finished, nothing to do
+        if self.finished:
+            return False
+
+        # If this is the last story, perform a fade-out to black and mark finished
+        if self.current_story >= self.max_stories:
+            success = self.fade_transition(self.current_story, None, clock)
+            if success:
+                self.finished = True
+                self.last_story_change = pygame.time.get_ticks()
+            return False
+
+        # Otherwise advance normally to the next story
+        next_story = self.current_story + 1
         if self.fade_transition(self.current_story, next_story, clock):
             self.current_story = next_story
             self.last_story_change = pygame.time.get_ticks()
@@ -139,3 +154,4 @@ class Stories:
         """Reset to first story"""
         self.current_story = 1
         self.reset_timer()
+        self.finished = False

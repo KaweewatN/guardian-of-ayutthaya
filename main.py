@@ -12,6 +12,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'module', 'games'))
 # Import game modules
 from game_start.game_start import GameStart
 from stories import Stories
+from board.board import Board
+from ui.quit_button import QuitButton
 
 # Initialize Pygame
 pygame.init()
@@ -36,26 +38,20 @@ class Game:
     
     def __init__(self):
         """Initialize the game"""
-        # Setup screen
-        if FULLSCREEN:
-            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        else:
-            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE)
-            
-        self.screen_width, self.screen_height = self.screen.get_size()
+        # Always use fullscreen with fixed size
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
+        self.screen_width, self.screen_height = SCREEN_WIDTH, SCREEN_HEIGHT
         pygame.display.set_caption("Story Game")
-        
+
         # Game state
         self.clock = pygame.time.Clock()
         self.running = True
-        self.game_state = "menu"  # "menu" or "playing"
-        
+        self.game_state = "menu"  # Start at the menu (start button)
+
         # Initialize modules
-        # Use GameStart from module/games/game_start/game_start.py
         self.menu = GameStart(self.screen)
-        
-        # Use Stories class from module/games/stories/stories.py
-        # Pass shared configuration to avoid duplication
+        self.board = Board(self.screen)
+
         colors_config = {'BLACK': BLACK, 'WHITE': WHITE}
         self.stories = Stories(
             screen=self.screen,
@@ -65,83 +61,102 @@ class Game:
             colors=colors_config,
             fps=FPS
         )
-        
-        # Font for instructions
-        self.small_font = pygame.font.SysFont('Times New Roman', 20, bold=True)
+
+        self.instruction_font = pygame.font.SysFont('Times New Roman', 24, bold=True)
+        # Reusable quit button UI
+        self.quit_button = QuitButton(self.screen)
         
     def handle_events(self):
         """Handle all game events"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-                
-            elif event.type == pygame.KEYDOWN:
+
+            # Let the quit button process the event (returns True if clicked)
+            try:
+                if self.quit_button.handle_event(event):
+                    self.running = False
+                    return
+            except Exception:
+                pass
+
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if self.game_state == "playing":
+                    if self.game_state == "stories":
                         self.game_state = "menu"
                         self.stories.reset()
+                    elif self.game_state == "board":
+                        self.game_state = "menu"
                     else:
                         self.running = False
-                        
-                elif event.key == pygame.K_SPACE and self.game_state == "playing":
+
+                elif event.key == pygame.K_SPACE and self.game_state == "stories":
                     # Manual skip
-                    if not self.stories.advance_story(self.clock):
-                        self.running = False
-                        
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if self.game_state == "playing" and event.button == 1:
-                    # Manual skip with click
-                    if not self.stories.advance_story(self.clock):
-                        self.running = False
-                        
-            elif event.type == pygame.VIDEORESIZE:
-                # Handle window resize
-                self.screen_width, self.screen_height = event.w, event.h
-                self.screen = pygame.display.set_mode(
-                    (self.screen_width, self.screen_height),
-                    pygame.RESIZABLE
-                )
-                self.menu.update_screen_size(self.screen)
-                self.stories.screen = self.screen
-                self.stories.load_story_images()
-            
-            # Handle menu events
+                    advanced = self.stories.advance_story(self.clock)
+                    if not advanced and self.stories.finished:
+                        self.game_state = "board"
+
+            # Mouse events
             if self.game_state == "menu":
                 if self.menu.handle_event(event):
-                    self.game_state = "playing"
+                    # Start button pressed -> show stories first
                     self.stories.reset()
+                    self.game_state = "stories"
+            elif self.game_state == "board":
+                if self.board.handle_event(event):
+                    pass  # Placeholder for future game logic
+            elif self.game_state == "stories":
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    advanced = self.stories.advance_story(self.clock)
+                    if not advanced and self.stories.finished:
+                        self.game_state = "board"
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    advanced = self.stories.advance_story(self.clock)
+                    if not advanced and self.stories.finished:
+                        self.game_state = "board"
+            # (quit handled above by quit_button.handle_event)
+            # No VIDEORESIZE handling needed
                     
     def update(self):
         """Update game logic"""
-        if self.game_state == "playing":
+        if self.game_state == "stories":
             # Check if it's time to auto-advance
             if self.stories.should_advance():
-                if not self.stories.advance_story(self.clock):
-                    self.running = False
+                advanced = self.stories.advance_story(self.clock)
+                if not advanced and self.stories.finished:
+                    self.game_state = "board"
                     
     def draw(self):
         """Draw the current game state"""
         if self.game_state == "menu":
-            # Draw start menu from module/games/game_start
             self.menu.draw()
-        elif self.game_state == "playing":
-            # Draw stories from module/games/stories - using Stories class
+        elif self.game_state == "board":
+            self.screen.fill(BLACK)
+            self.board.draw()
+        elif self.game_state == "stories":
             self.stories.draw_story(self.stories.current_story)
-            
-            # Draw ESC instruction
-            instruction_text = self.small_font.render("Press ESC to return to menu | SPACE or CLICK to skip", True, WHITE)
+
+            # Draw ESC instruction (bigger font, lower position)
+            instruction_text = self.instruction_font.render(
+                "Press ESC to return to menu | SPACE or CLICK to skip", True, WHITE)
             instruction_rect = instruction_text.get_rect(
-                center=(self.screen_width // 2, self.screen_height - 30)
+                center=(self.screen_width // 2, self.screen_height + 70)
             )
-            
+
             # Semi-transparent background
-            bg_rect = instruction_rect.inflate(20, 10)
+            bg_rect = instruction_rect.inflate(40, 20)
             s = pygame.Surface((bg_rect.width, bg_rect.height))
             s.set_alpha(128)
             s.fill(BLACK)
             self.screen.blit(s, bg_rect)
             self.screen.blit(instruction_text, instruction_rect)
-            
+
+        # Draw reusable quit button (always on top)
+        try:
+            self.quit_button.draw()
+        except Exception:
+            pass
+
         pygame.display.flip()
         
     def run(self):
