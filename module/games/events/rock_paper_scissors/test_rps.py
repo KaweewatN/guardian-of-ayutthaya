@@ -6,10 +6,17 @@ import pygame
 import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+# Add module/games to path so we can import the mini-game directly
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'module', 'games'))
 
-from module.games.rock_paper_scissors import RockPaperScissors
+try:
+    # Try the package-style import first
+    from module.games.rock_paper_scissors import RockPaperScissors
+except Exception:
+    # Fallback to direct import from module/games folder
+    from rock_paper_scissors.rock_paper_scissors import RockPaperScissors
+
 
 
 def main():

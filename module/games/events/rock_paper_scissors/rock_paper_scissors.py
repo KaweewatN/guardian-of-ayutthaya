@@ -7,9 +7,34 @@ import os
 import sys
 import random
 
-# Add constant directory to path for font imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'constant'))
-from fonts import BUTTON_FONT, BUTTON_FONT_LARGE, TEXT_FONT, TEXT_FONT_BOLD, SUBTITLE_FONT
+# Import fonts robustly: prefer package-style `constant.fonts`, then fall back
+# to adding the top-level `constant` directory and importing `fonts`. If both
+# fail, provide simple pygame SysFont fallbacks to avoid import errors in tests.
+try:
+    from constant.fonts import BUTTON_FONT, BUTTON_FONT_LARGE, TEXT_FONT, TEXT_FONT_BOLD, SUBTITLE_FONT
+except Exception:
+    try:
+        const_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'constant'))
+        if const_path not in sys.path:
+            sys.path.insert(0, const_path)
+        from fonts import BUTTON_FONT, BUTTON_FONT_LARGE, TEXT_FONT, TEXT_FONT_BOLD, SUBTITLE_FONT
+    except Exception as e:
+        print(f"Warning: Fonts import failed ({e}). Using pygame fallback fonts.")
+        try:
+            pygame_font = pygame.font.SysFont(None, 28)
+        except Exception:
+            class _DummyFont:
+                def render(self, text, aa, color):
+                    surf = pygame.Surface((max(200, len(text) * 10), 30))
+                    surf.fill((200, 200, 200))
+                    return surf
+            pygame_font = _DummyFont()
+
+        BUTTON_FONT = pygame_font
+        BUTTON_FONT_LARGE = pygame_font
+        TEXT_FONT = pygame_font
+        TEXT_FONT_BOLD = pygame_font
+        SUBTITLE_FONT = pygame_font
 
 
 class RockPaperScissors:
@@ -48,6 +73,8 @@ class RockPaperScissors:
         self.BUTTON_HOVER_COLOR = (220, 175, 111)  # Lighter version for hover
         self.BUTTON_TEXT_COLOR = (75, 42, 12)  # #4B2A0C
         self.BUTTON_BORDER_COLOR = (168, 107, 39)  # #A86B27
+        # Default background color used when no bg image is available
+        self.BG_COLOR = (245, 235, 220)
         
         
         # Game state

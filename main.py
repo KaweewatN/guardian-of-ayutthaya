@@ -14,7 +14,8 @@ from game_start.game_start import GameStart
 from stories import Stories
 from board.board import Board
 from ui.quit_button import QuitButton
-from rock_paper_scissors.rock_paper_scissors import RockPaperScissors
+from events.rock_paper_scissors.rock_paper_scissors import RockPaperScissors
+from events.guess.guess import GuessGame
 
 # Initialize Pygame
 pygame.init()
@@ -106,8 +107,8 @@ class Game:
             elif self.game_state == "board":
                 if self.board.handle_event(event):
                     # Launch the rock-paper-scissors mini-game (blocking until finished)
-                    # Use block number 6 by default (can be adapted later)
-                    self.run_rock_paper_scissors(6)
+                    # Use block number 17
+                    self.run_rock_paper_scissors(17)
             elif self.game_state == "stories":
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     advanced = self.stories.advance_story(self.clock)
@@ -159,6 +160,49 @@ class Game:
 
             # Draw mini-game
             rps.draw()
+            # Draw quit button on top
+            try:
+                self.quit_button.draw()
+            except Exception:
+                pass
+            pygame.display.flip()
+
+        # After mini-game returns, optionally handle rewards or state
+        return
+                    
+    def run_guess_game(self, block_number=9):
+        """Run the Guess mini-game in a blocking loop until it returns a result.
+
+        Default block_number is 9 to match available guess assets.
+        """
+        try:
+            guess = GuessGame(self.screen, block_number)
+        except Exception as e:
+            print(f"Failed to start GuessGame: {e}")
+            return
+
+        running_guess = True
+        while running_guess and self.running:
+            self.clock.tick(FPS)
+            for event in pygame.event.get():
+                # Allow quit button to work while in mini-game
+                try:
+                    if self.quit_button.handle_event(event):
+                        self.running = False
+                        running_guess = False
+                        break
+                except Exception:
+                    pass
+
+                # Pass event to mini-game
+                res = guess.handle_event(event)
+                if isinstance(res, dict) and res.get("result") in ("win", "lose"):
+                    # Mini-game finished with a result
+                    running_guess = False
+                    break
+
+            # Draw mini-game
+            guess.draw()
             # Draw quit button on top
             try:
                 self.quit_button.draw()
