@@ -1,9 +1,13 @@
-"""Math event intro and puzzle prompt screen."""
+"""Interactive math puzzle event for block 3."""
+from __future__ import annotations
+
 import os
 import sys
+from typing import Dict, List, Optional, Sequence, Tuple
+
 import pygame
 
-# Import shared fonts with fallbacks similar to other event modules
+# Import shared fonts with a graceful fallback similar to other modules.
 try:
     from constant.fonts import (
         BUTTON_FONT,
@@ -19,250 +23,454 @@ except Exception:
         )
         if const_path not in sys.path:
             sys.path.insert(0, const_path)
-        from fonts import (
+        from fonts import (  # type: ignore
             BUTTON_FONT,
             BUTTON_FONT_LARGE,
             TEXT_FONT,
             TEXT_FONT_BOLD,
             SUBTITLE_FONT,
         )
-    except Exception as e:
-        print(f"Warning: Fonts import failed ({e}). Using pygame fallback fonts.")
-        try:
-            pygame_font = pygame.font.SysFont(None, 28)
-        except Exception:
-            class _DummyFont:
-                def render(self, text, aa, color):
-                    surf = pygame.Surface((max(200, len(text) * 10), 30))
-                    surf.fill((200, 200, 200))
-                    return surf
+    except Exception as exc:  # pragma: no cover - pygame fallback
+        print(f"Warning: Fonts import failed ({exc}). Using pygame fallback fonts.")
+        pygame.font.init()
 
-            pygame_font = _DummyFont()
+        def _fallback_font(size: int) -> pygame.font.Font:
+            return pygame.font.SysFont(None, size)
 
-        BUTTON_FONT = pygame_font
-        BUTTON_FONT_LARGE = pygame_font
-        TEXT_FONT = pygame_font
-        TEXT_FONT_BOLD = pygame_font
-        SUBTITLE_FONT = pygame_font
-
-
-def _wrap_text(font, text, max_width):
-    """Wrap text to fit within max_width using the provided font."""
-    if not text:
-        return []
-
-    words = text.split()
-    lines = []
-    current_line = ""
-
-    for word in words:
-        candidate = word if not current_line else f"{current_line} {word}"
-        if font.size(candidate)[0] <= max_width:
-            current_line = candidate
-        else:
-            if current_line:
-                lines.append(current_line)
-            current_line = word
-
-    if current_line:
-        lines.append(current_line)
-
-    return lines
+        BUTTON_FONT = _fallback_font(24)
+        BUTTON_FONT_LARGE = _fallback_font(32)
+        TEXT_FONT = _fallback_font(28)
+        TEXT_FONT_BOLD = _fallback_font(30)
+        SUBTITLE_FONT = _fallback_font(30)
 
 
 class MathEvent:
-    """Introductory math mini-event for block 3."""
+    """Intro sequence followed by a timed arithmetic puzzle."""
 
-    STATE_INTRO = "intro"
+    STATE_INTRO_1 = "intro_1"
+    STATE_INTRO_2 = "intro_2"
     STATE_PUZZLE = "puzzle"
+    STATE_RESULT_SUCCESS = "result_success"
+    STATE_RESULT_FAILURE = "result_failure"
     STATE_SKIPPED = "skipped"
-    STATE_COMPLETE = "complete"
 
-    def __init__(self, screen, block_number=3):
+    RESULT_EVENT = pygame.USEREVENT + 42
+    RESULT_DELAY_MS = 1500
+    TIMER_LIMIT_MS = 20_000
+
+    DIGITS: Sequence[int] = (2, 3, 4, 9)
+
+    def __init__(self, screen: pygame.Surface, block_number: int = 3) -> None:
         self.screen = screen
+        self.block_number = block_number
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
-        self.block_number = block_number
 
-        self.state = self.STATE_INTRO
-        self.hovered_skip = False
+        self.scale_x = self.screen_width / 1280
+        self.scale_y = self.screen_height / 832
+
+        self.state = self.STATE_INTRO_1
         self.finished = False
+        self.pending_result: Optional[Dict[str, str]] = None
 
-        # Text content
-        self.description_text = (
-            "This is Wat Na Phra Men, the only temple untouched by war. "
-            "Once a royal cremation ground, now it shelters a bronze Buddha in "
-            "royal robes. A peaceful witness to Ayutthaya's fall and rebirth."
-        )
-        self.puzzle_text = (
-            "Solve this to get the alphabet cards.\n2, 3, 4, 9 \u2192 Can you make 24?"
-        )
+        # --- Text content -------------------------------------------------
+        self.intro_texts = [
+            "This is Wat Na Phra Men, /brthe only temple untouched by war. /br"
+            "Once a royal cremation ground,/brnow it shelters a bronze Buddha in royal robes./br"
+            "a peaceful witness to Ayutthaya’s fall and rebirth/br",
+            "Solve this to get the /br alphabet cards./br2, 3, 4, 9 → Can you make 24?",
+        ]
+        self.success_text = "Well done! You receive the letter"
+        self.failure_text = "That’s not 24 yet. Try again."
 
-        # Layout rectangles based on provided specifications
-        self.description_rect = pygame.Rect(279, 244, 578, 184)
-        self.puzzle_rect = pygame.Rect(279, 224, 565, 172)
+        self.dialog_rect = self._scaled_rect(250, 170, 780, 280)
 
-        # Skip button configuration
-        self.skip_rect = pygame.Rect(self.screen_width - 200 - 48, 48, 200, 64)
+        self.dialog_font = SUBTITLE_FONT
+        self.dialog_line_height = int(36 * self.scale_y)
 
-        # Fonts
-        self.desc_font = TEXT_FONT
-        self.puzzle_font = SUBTITLE_FONT
-        self.skip_font = BUTTON_FONT
-        self.instruction_font = TEXT_FONT_BOLD
-
-        # Load imagery
-        self.background = self._load_scaled_image(
+        # --- Imagery ------------------------------------------------------
+        self.background_intro = self._load_scaled_image(
             f"assets/scene/event/math/blocks/{self.block_number}.png"
         )
-        self.skip_background = self._load_scaled_image(
+        self.background_puzzle = self._load_scaled_image(
             f"assets/scene/empty/{self.block_number}.png"
         )
+        self.background_result = self.background_intro
 
-        # Pre-render text lines
-        self.description_lines = _wrap_text(self.desc_font, self.description_text, self.description_rect.width)
-        self.puzzle_lines = _wrap_text(self.puzzle_font, self.puzzle_text, self.puzzle_rect.width)
+        # --- Puzzle state -------------------------------------------------
+        self.selected_slot: Optional[int] = None
+        self.slot_values: List[Optional[int]] = [None, None, None, None]
+        self.timer_start: Optional[int] = None
+        self.timer_expired = False
+        self.digit_display_rects: List[pygame.Rect] = []
 
-    def _load_scaled_image(self, relative_path):
-        """Load and scale an image to the current screen size."""
+        self.slot_rects = [
+            self._scaled_rect(199, 364, 87, 87),
+            self._scaled_rect(400, 364, 87, 87),
+            self._scaled_rect(641, 364, 87, 87),
+            self._scaled_rect(878, 364, 87, 87),
+        ]
+        self.panel_rect = self._scaled_rect(61, 340, 1157, 129)
+        self.submit_rect = self._scaled_rect(518, 634, 243, 78)
+        self.submit_inner_rect = self._scaled_rect(518, 643, 243, 60)
+
+        # Fonts for puzzle overlay
+        base_operator_size = max(32, int(64 * self.scale_y))
+        base_digit_size = max(32, int(48 * self.scale_y))
+        base_timer_size = max(40, int(80 * self.scale_y))
+
+        self.operator_font = pygame.font.SysFont("Abyssinica SIL", base_operator_size)
+        if self.operator_font is None:
+            self.operator_font = pygame.font.SysFont(None, base_operator_size)
+        self.result_value_font = pygame.font.SysFont("Abyssinica SIL", max(48, int(89 * self.scale_y)))
+        if self.result_value_font is None:
+            self.result_value_font = pygame.font.SysFont(None, max(48, int(89 * self.scale_y)))
+        self.digit_font = pygame.font.SysFont("Inknut Antiqua", base_digit_size)
+        if self.digit_font is None:
+            self.digit_font = pygame.font.SysFont(None, base_digit_size)
+        self.timer_font = pygame.font.SysFont("Abyssinica SIL", base_timer_size)
+        if self.timer_font is None:
+            self.timer_font = pygame.font.SysFont(None, base_timer_size)
+
+        self.submit_font = pygame.font.SysFont("Inknut Antiqua", max(18, int(24 * self.scale_y)))
+        if self.submit_font is None:
+            self.submit_font = pygame.font.SysFont(None, max(18, int(24 * self.scale_y)))
+
+        # Pre-render text lines for intro and results.
+        self.intro_lines: List[List[str]] = [
+            self._prepare_lines(text, self.dialog_font, self.dialog_rect.width)
+            for text in self.intro_texts
+        ]
+        self.result_lines_success = self._prepare_lines(
+            self.success_text, self.dialog_font, self.dialog_rect.width
+        )
+        self.result_lines_failure = self._prepare_lines(
+            self.failure_text, self.dialog_font, self.dialog_rect.width
+        )
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+    def _scaled_rect(self, x: float, y: float, w: float, h: float) -> pygame.Rect:
+        return pygame.Rect(
+            int(x * self.scale_x),
+            int(y * self.scale_y),
+            int(w * self.scale_x),
+            int(h * self.scale_y),
+        )
+
+    def _load_scaled_image(self, relative_path: str) -> Optional[pygame.Surface]:
         if not os.path.exists(relative_path):
             return None
         try:
             image = pygame.image.load(relative_path)
             return pygame.transform.scale(image, (self.screen_width, self.screen_height))
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover - IO errors
             print(f"Warning: failed to load {relative_path}: {exc}")
             return None
 
-    def handle_event(self, event):
-        if self.finished:
+    def _prepare_lines(
+        self, text: str, font: pygame.font.Font, max_width: int
+    ) -> List[str]:
+        cleaned = text.replace("/br", "\n").replace("\u2028", "\n").replace("\u2029", "\n")
+        parts = cleaned.split("\n")
+        lines: List[str] = []
+        for part in parts:
+            words = part.split()
+            current = ""
+            for word in words:
+                candidate = word if not current else f"{current} {word}"
+                if font.size(candidate)[0] <= max_width:
+                    current = candidate
+                else:
+                    if current:
+                        lines.append(current)
+                    current = word
+            if current:
+                lines.append(current)
+        return lines
+
+    # ------------------------------------------------------------------
+    # Event handling
+    # ------------------------------------------------------------------
+    def handle_event(self, event: pygame.event.Event) -> Optional[Dict[str, str]]:
+        if self.finished and self.pending_result is None:
             return None
 
-        if event.type == pygame.MOUSEMOTION:
-            self.hovered_skip = self.skip_rect.collidepoint(event.pos)
+        if event.type == pygame.QUIT:
+            self.finished = True
+            self.pending_result = {"result": "quit"}
+            return self.pending_result
 
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.skip_rect.collidepoint(event.pos):
-                self.state = self.STATE_SKIPPED
-                self.finished = True
-                return {"result": "skipped"}
+        if event.type == self.RESULT_EVENT and self.pending_result is not None:
+            pygame.time.set_timer(self.RESULT_EVENT, 0)
+            result = self.pending_result
+            self.pending_result = None
+            self.finished = True
+            return result
 
-            if self.state == self.STATE_INTRO:
-                self.state = self.STATE_PUZZLE
-            elif self.state == self.STATE_PUZZLE:
-                self.state = self.STATE_COMPLETE
-                self.finished = True
-                return {"result": "continue"}
-
-        elif event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_SPACE, pygame.K_RETURN):
-                if self.state == self.STATE_INTRO:
-                    self.state = self.STATE_PUZZLE
-                elif self.state == self.STATE_PUZZLE:
-                    self.state = self.STATE_COMPLETE
+        if self.state in (self.STATE_RESULT_SUCCESS, self.STATE_RESULT_FAILURE):
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                if self.pending_result is not None:
+                    pygame.time.set_timer(self.RESULT_EVENT, 0)
+                    result = self.pending_result
+                    self.pending_result = None
                     self.finished = True
-                    return {"result": "continue"}
-            elif event.key == pygame.K_ESCAPE:
-                # Treat ESC as skipping the event
-                self.state = self.STATE_SKIPPED
-                self.finished = True
-                return {"result": "skipped"}
+                    return result
+            return None
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.state = self.STATE_SKIPPED
+            self.finished = True
+            return {"result": "skipped"}
+
+        if self.state in (self.STATE_INTRO_1, self.STATE_INTRO_2):
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button != 1:
+                    return None
+                if event.type == pygame.KEYDOWN and event.key not in (
+                    pygame.K_SPACE,
+                    pygame.K_RETURN,
+                ):
+                    return None
+                self._advance_intro()
+            return None
+
+        if self.state == self.STATE_PUZZLE:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.submit_rect.collidepoint(event.pos):
+                    self._submit_solution()
+                else:
+                    clicked_slot = False
+                    for index, rect in enumerate(self.slot_rects):
+                        if rect.collidepoint(event.pos):
+                            self.selected_slot = index
+                            clicked_slot = True
+                            break
+                    if not clicked_slot:
+                        for idx, rect in enumerate(self.digit_display_rects):
+                            if rect.collidepoint(event.pos):
+                                if self.selected_slot is None:
+                                    self.selected_slot = 0
+                                self._assign_digit(self.selected_slot, self.DIGITS[idx])
+                                break
+            elif event.type == pygame.KEYDOWN:
+                if self.selected_slot is None:
+                    return None
+                if event.key == pygame.K_BACKSPACE:
+                    self.slot_values[self.selected_slot] = None
+                    return None
+                value = self._key_to_digit(event)
+                if value is None:
+                    return None
+                self._assign_digit(self.selected_slot, value)
+            return None
 
         return None
 
-    def draw(self):
+    def _advance_intro(self) -> None:
+        if self.state == self.STATE_INTRO_1:
+            self.state = self.STATE_INTRO_2
+        elif self.state == self.STATE_INTRO_2:
+            self.state = self.STATE_PUZZLE
+            self.timer_start = pygame.time.get_ticks()
+            self.selected_slot = 0
+            self.slot_values = [None, None, None, None]
+            self.timer_expired = False
+
+    def _key_to_digit(self, event: pygame.event.Event) -> Optional[int]:
+        try:
+            char = event.unicode
+        except AttributeError:
+            return None
+        if not char or not char.isdigit():
+            return None
+        value = int(char)
+        if value in self.DIGITS:
+            return value
+        return None
+
+    def _assign_digit(self, slot_index: int, value: int) -> None:
+        # Remove the value from any other slot so it stays unique.
+        for idx, existing in enumerate(self.slot_values):
+            if idx != slot_index and existing == value:
+                self.slot_values[idx] = None
+        self.slot_values[slot_index] = value
+        for idx, existing in enumerate(self.slot_values):
+            if existing is None:
+                self.selected_slot = idx
+                break
+        else:
+            self.selected_slot = slot_index
+
+    def _submit_solution(self) -> None:
+        if None in self.slot_values:
+            return
+        a, b, c, d = [int(v) for v in self.slot_values]
+        result = ((a / b) * c) * d
+        success = abs(result - 24) < 1e-6
+        self._trigger_result(success)
+
+    def _trigger_result(self, success: bool) -> None:
+        if success:
+            self.state = self.STATE_RESULT_SUCCESS
+            self.pending_result = {"result": "continue"}
+        else:
+            self.state = self.STATE_RESULT_FAILURE
+            self.pending_result = {"result": "failed"}
+        self.timer_start = None
+        self.timer_expired = True
+        pygame.time.set_timer(self.RESULT_EVENT, self.RESULT_DELAY_MS)
+
+    # ------------------------------------------------------------------
+    # Drawing helpers
+    # ------------------------------------------------------------------
+    def draw(self) -> None:
         if self.state == self.STATE_SKIPPED:
-            if self.skip_background:
-                self.screen.blit(self.skip_background, (0, 0))
-            else:
-                self.screen.fill((0, 0, 0))
+            self.screen.fill((0, 0, 0))
             return
 
-        # Draw background image or fallback color
-        if self.background:
-            self.screen.blit(self.background, (0, 0))
+        if self.state in (self.STATE_INTRO_1, self.STATE_INTRO_2):
+            self._draw_background(self.background_intro)
+            index = 0 if self.state == self.STATE_INTRO_1 else 1
+            self._draw_dialog(self.intro_lines[index])
+            return
+
+        if self.state == self.STATE_PUZZLE:
+            self._draw_puzzle()
+            return
+
+        if self.state == self.STATE_RESULT_SUCCESS:
+            self._draw_background(self.background_result)
+            self._draw_dialog(self.result_lines_success)
+            return
+
+        if self.state == self.STATE_RESULT_FAILURE:
+            self._draw_background(self.background_result)
+            self._draw_dialog(self.result_lines_failure)
+            return
+
+    def _draw_background(self, background: Optional[pygame.Surface]) -> None:
+        if background is not None:
+            self.screen.blit(background, (0, 0))
         else:
             self.screen.fill((255, 255, 255))
 
-        # Draw text blocks depending on the state
-        if self.state == self.STATE_INTRO:
-            self._draw_text_block(
-                self.description_rect,
-                self.description_lines,
-                self.desc_font,
-                line_height=36,
-            )
-        elif self.state in (self.STATE_PUZZLE, self.STATE_COMPLETE):
-            # Draw description as context and puzzle prompt layered above
-            self._draw_text_block(
-                self.description_rect,
-                self.description_lines,
-                self.desc_font,
-                line_height=36,
-                background_alpha=190,
-            )
-            self._draw_text_block(
-                self.puzzle_rect,
-                self.puzzle_lines,
-                self.puzzle_font,
-                line_height=40,
-                background_alpha=210,
-            )
+    def _draw_dialog(self, lines: Sequence[str]) -> None:
+        panel = pygame.Surface((self.dialog_rect.width, self.dialog_rect.height), pygame.SRCALPHA)
+        panel.fill((255, 255, 255, 235))
+        self.screen.blit(panel, self.dialog_rect.topleft)
 
-        # Instruction text at the bottom for intro/puzzle states
-        if self.state != self.STATE_COMPLETE:
-            instruction = self.instruction_font.render(
-                "Press SPACE or CLICK to continue",
-                True,
-                (0, 0, 0),
-            )
-            instruction_rect = instruction.get_rect(
-                center=(self.screen_width // 2, self.screen_height - 60)
-            )
-            self.screen.blit(instruction, instruction_rect)
-
-        # Draw skip button (not shown after completion)
-        if self.state != self.STATE_COMPLETE:
-            self._draw_skip_button()
-
-    def _draw_text_block(
-        self,
-        rect,
-        lines,
-        font,
-        line_height,
-        color=(0, 0, 0),
-        background_alpha=220,
-    ):
-        """Render multiline text inside a semi-transparent panel."""
-        if not lines:
-            return
-
-        panel = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        panel.fill((255, 255, 255, background_alpha))
-        self.screen.blit(panel, rect.topleft)
-
-        total_height = line_height * len(lines)
-        start_y = rect.top + max(0, (rect.height - total_height) // 2)
-
-        for i, line in enumerate(lines):
-            text_surface = font.render(line, True, color)
+        total_height = len(lines) * self.dialog_line_height
+        start_y = self.dialog_rect.top + max(0, (self.dialog_rect.height - total_height) // 2)
+        for idx, line in enumerate(lines):
+            text_surface = self.dialog_font.render(line, True, (0, 0, 0))
             text_rect = text_surface.get_rect()
-            text_rect.centerx = rect.centerx
-            text_rect.y = start_y + i * line_height
+            text_rect.centerx = self.dialog_rect.centerx
+            text_rect.y = start_y + idx * self.dialog_line_height
             self.screen.blit(text_surface, text_rect)
 
-    def _draw_skip_button(self):
-        base_color = (200, 155, 91)
-        hover_color = (220, 175, 111)
-        text_color = (75, 42, 12)
+    def _draw_puzzle(self) -> None:
+        self._draw_background(self.background_puzzle)
 
-        color = hover_color if self.hovered_skip else base_color
-        pygame.draw.rect(self.screen, color, self.skip_rect, border_radius=12)
-        pygame.draw.rect(self.screen, (168, 107, 39), self.skip_rect, width=2, border_radius=12)
+        overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+        overlay.fill((217, 217, 217, int(0.6 * 255)))
+        self.screen.blit(overlay, (0, 0))
 
-        label = self.skip_font.render("Skip", True, text_color)
-        label_rect = label.get_rect(center=self.skip_rect.center)
+        panel = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
+        panel.fill((217, 217, 217, 255))
+        self.screen.blit(panel, self.panel_rect.topleft)
+
+        # Slot backgrounds
+        for index, rect in enumerate(self.slot_rects):
+            slot_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            slot_surface.fill((136, 103, 50, int(0.5 * 255)))
+            self.screen.blit(slot_surface, rect.topleft)
+            border_color = (0, 0, 0)
+            pygame.draw.rect(self.screen, border_color, rect, width=4)
+            if self.selected_slot == index:
+                pygame.draw.rect(self.screen, (255, 215, 0), rect, width=4)
+
+        self._draw_puzzle_notation()
+        self._draw_slot_values()
+        self._draw_available_digits()
+        self._draw_timer()
+        self._draw_submit_button()
+
+        if self.state == self.STATE_PUZZLE and self.timer_start is not None and not self.timer_expired:
+            elapsed = pygame.time.get_ticks() - self.timer_start
+            if elapsed >= self.TIMER_LIMIT_MS:
+                self.timer_expired = True
+                self._trigger_result(False)
+
+    def _draw_puzzle_notation(self) -> None:
+        elements: List[Tuple[str, Tuple[float, float]]] = [
+            ("(", (69, 364)),
+            ("(", (119, 364)),
+            ("÷", (304, 359)),
+            (")", (487, 364)),
+            ("×", (553, 364)),
+            (")", (730, 364)),
+            ("×", (788, 364)),
+            ("=", (980, 364)),
+            ("24", (1046, 359)),
+        ]
+        for symbol, (x, y) in elements:
+            pos_x = int(x * self.scale_x)
+            pos_y = int(y * self.scale_y)
+            if symbol == "24":
+                surface = self.result_value_font.render(symbol, True, (0, 0, 0))
+            else:
+                surface = self.operator_font.render(symbol, True, (0, 0, 0))
+            rect = surface.get_rect()
+            rect.topleft = (pos_x, pos_y)
+            self.screen.blit(surface, rect)
+
+    def _draw_slot_values(self) -> None:
+        for value, rect in zip(self.slot_values, self.slot_rects):
+            if value is None:
+                continue
+            text_surface = self.digit_font.render(str(value), True, (0, 0, 0))
+            text_rect = text_surface.get_rect(center=rect.center)
+            self.screen.blit(text_surface, text_rect)
+
+    def _draw_available_digits(self) -> None:
+        base_y = int(520 * self.scale_y)
+        spacing = int(80 * self.scale_x)
+        start_x = int(400 * self.scale_x)
+        used_digits = {value for value in self.slot_values if value is not None}
+        self.digit_display_rects = []
+        for index, digit in enumerate(self.DIGITS):
+            x = start_x + index * spacing
+            color = (0, 0, 0) if digit not in used_digits else (120, 120, 120)
+            label = self.digit_font.render(str(digit), True, color)
+            rect = label.get_rect(center=(x, base_y))
+            self.screen.blit(label, rect)
+            self.digit_display_rects.append(rect)
+
+    def _draw_timer(self) -> None:
+        if self.timer_start is None:
+            remaining = self.TIMER_LIMIT_MS
+        else:
+            elapsed = pygame.time.get_ticks() - self.timer_start
+            remaining = max(0, self.TIMER_LIMIT_MS - elapsed)
+        seconds = max(0, remaining // 1000)
+        minutes = seconds // 60
+        seconds = seconds % 60
+        timer_text = f"{minutes:02d}:{seconds:02d}"
+        surface = self.timer_font.render(timer_text, True, (81, 62, 62))
+        rect = surface.get_rect(center=(self.screen_width // 2, int(120 * self.scale_y)))
+        self.screen.blit(surface, rect)
+
+    def _draw_submit_button(self) -> None:
+        pygame.draw.rect(self.screen, (176, 160, 134), self.submit_rect, border_radius=15)
+        pygame.draw.rect(self.screen, (109, 109, 109), self.submit_rect, width=4, border_radius=15)
+        inner_surface = pygame.Surface((self.submit_inner_rect.width, self.submit_inner_rect.height))
+        inner_surface.fill((176, 160, 134))
+        self.screen.blit(inner_surface, self.submit_inner_rect.topleft)
+
+        label = self.submit_font.render("SUBMIT", True, (0, 0, 0))
+        label_rect = label.get_rect(center=self.submit_rect.center)
         self.screen.blit(label, label_rect)
 
 

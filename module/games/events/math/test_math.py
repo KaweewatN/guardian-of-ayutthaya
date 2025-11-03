@@ -72,17 +72,6 @@ def create_buttons(screen_width, screen_height, button_labels, columns=4, rows=2
 def draw_selection_screen(screen, buttons):
     screen.fill(BACKGROUND_COLOR)
 
-    title_font = pygame.font.SysFont(FONT_NAME, 48, bold=True)
-    subtitle_font = pygame.font.SysFont(FONT_NAME, 24)
-
-    title = title_font.render("Math Event Test", True, TEXT_COLOR)
-    title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 60))
-    screen.blit(title, title_rect)
-
-    subtitle = subtitle_font.render("Click block 3 to preview the intro screens", True, TEXT_COLOR)
-    subtitle_rect = subtitle.get_rect(center=(SCREEN_WIDTH // 2, 110))
-    screen.blit(subtitle, subtitle_rect)
-
     for button in buttons:
         rect = button["rect"]
         is_hovered = rect.collidepoint(pygame.mouse.get_pos())
@@ -91,10 +80,6 @@ def draw_selection_screen(screen, buttons):
         pygame.draw.rect(screen, TEXT_COLOR, rect, width=2, border_radius=12)
         button["text_rect"].center = rect.center
         screen.blit(button["text_surface"], button["text_rect"])
-
-    instruction = subtitle_font.render("Press ESC to quit", True, TEXT_COLOR)
-    instruction_rect = instruction.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 40))
-    screen.blit(instruction, instruction_rect)
 
 
 def main():
