@@ -79,14 +79,14 @@ class MathEvent:
             "This is Wat Na Phra Men, /brthe only temple untouched by war. /br"
             "Once a royal cremation ground,/brnow it shelters a bronze Buddha in royal robes./br"
             "a peaceful witness to Ayutthaya’s fall and rebirth/br",
-            "Solve this to get the /br alphabet cards./br2, 3, 4, 9 → Can you make 24?",
+            "Solve this to get the /br alphabet cards./br2, 3, 4, 9 Can you make 24?",
         ]
         self.success_text = "Well done! You receive the letter"
         self.failure_text = "That’s not 24 yet. Try again."
 
         # Intro text layout (smaller font, no background panel)
         intro_font_size = max(22, int(30 * self.scale_min))
-        self.intro_font = pygame.font.SysFont("Abyssinica SIL", intro_font_size)
+        self.intro_font = pygame.font.SysFont("Inknut Antiqua", intro_font_size)
         if self.intro_font is None:
             self.intro_font = pygame.font.SysFont(None, intro_font_size)
         self.intro_line_height = max(int(self.intro_font.get_linesize() * 1.15), 24)
@@ -96,9 +96,9 @@ class MathEvent:
             int(960 * self.scale_x),
             int(360 * self.scale_y),
         )
-        instruction_font_size = max(18, int(26 * self.scale_min))
+        instruction_font_size = max(18, int(80 * self.scale_min))
         self.intro_instruction_font = pygame.font.SysFont(
-            "Abyssinica SIL", instruction_font_size
+            "Inknut Antiqua", instruction_font_size
         )
         if self.intro_instruction_font is None:
             self.intro_instruction_font = pygame.font.SysFont(None, instruction_font_size)
@@ -163,7 +163,7 @@ class MathEvent:
 
         self.timer_center = (
             self.screen_width // 2,
-            max(int(90 * self.scale_y), self.panel_rect.top - self.section_gap),
+            max(int(50 * self.scale_y), self.panel_rect.top - self.section_gap - int(20 * self.scale_y)),
         )
 
         # Fonts for puzzle overlay
@@ -189,8 +189,9 @@ class MathEvent:
             self.submit_font = pygame.font.SysFont(None, max(18, int(24 * self.scale_y)))
 
         # Pre-render text lines for intro and results.
+        # Pre-render text lines for intro and results.
         self.intro_lines: List[List[str]] = [
-            self._prepare_lines(text, self.intro_font, self.intro_rect.width)
+            self._prepare_lines(text, self.dialog_font, self.dialog_rect.width)
             for text in self.intro_texts
         ]
         self.result_lines_success = self._prepare_lines(
@@ -409,18 +410,32 @@ class MathEvent:
             self.screen.fill((255, 255, 255))
 
     def _draw_intro(self, lines: Sequence[str]) -> None:
-        total_height = len(lines) * self.intro_line_height
-        start_y = self.intro_rect.top + max(0, (self.intro_rect.height - total_height) // 2)
+        # Use the same dialog font & line height as the outro
+        line_height = self.dialog_line_height
+        total_height = len(lines) * line_height
+        start_y = self.dialog_rect.top + max(0, (self.dialog_rect.height - total_height) // 2)
+
         for idx, line in enumerate(lines):
-            text_surface = self.intro_font.render(line, True, (255, 255, 255))
+            text_surface = self.dialog_font.render(line, True, (0, 0, 0))
             text_rect = text_surface.get_rect()
-            text_rect.centerx = self.intro_rect.centerx
-            text_rect.y = start_y + idx * self.intro_line_height
+            text_rect.centerx = self.dialog_rect.centerx
+            text_rect.y = start_y + idx * line_height
             self.screen.blit(text_surface, text_rect)
 
-        instruction_surface = self.intro_instruction_font.render(
-            "Press SPACE or CLICK to continue", True, (255, 255, 255)
-        )
+        # Render the instruction with the SAME FONT as dialog (self.dialog_font)
+        # but keep the SAME SIZE you were using before by scaling down to that height.
+        instruction_text = "Press SPACE or CLICK to continue"
+        base_surface = self.dialog_font.render(instruction_text, True, (255, 255, 255))
+
+        # target height = whatever your old intro_instruction_font would render
+        target_h = self.intro_instruction_font.get_linesize()
+        if base_surface.get_height() != target_h:
+            scale = target_h / base_surface.get_height()
+            scaled_w = max(1, int(base_surface.get_width() * scale))
+            instruction_surface = pygame.transform.smoothscale(base_surface, (scaled_w, target_h))
+        else:
+            instruction_surface = base_surface
+
         instruction_rect = instruction_surface.get_rect()
         instruction_rect.center = (
             self.screen_width // 2,
@@ -429,10 +444,6 @@ class MathEvent:
         self.screen.blit(instruction_surface, instruction_rect)
 
     def _draw_dialog(self, lines: Sequence[str]) -> None:
-        panel = pygame.Surface((self.dialog_rect.width, self.dialog_rect.height), pygame.SRCALPHA)
-        panel.fill((255, 255, 255, 235))
-        self.screen.blit(panel, self.dialog_rect.topleft)
-
         total_height = len(lines) * self.dialog_line_height
         start_y = self.dialog_rect.top + max(0, (self.dialog_rect.height - total_height) // 2)
         for idx, line in enumerate(lines):
