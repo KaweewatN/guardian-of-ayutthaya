@@ -62,8 +62,10 @@ class RockPaperScissors:
         
         
         self.screen = screen
-        self.screen_width = screen.get_width()
-        self.screen_height = screen.get_height()
+        # self.screen_width = screen.get_width()
+        # self.screen_height = screen.get_height()
+        self.screen_width = 1280
+        self.screen_height = 832
         self.block_number = block_number
         
         # Colors
