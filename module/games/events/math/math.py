@@ -68,6 +68,7 @@ class MathEvent:
 
         self.scale_x = self.screen_width / 1280
         self.scale_y = self.screen_height / 832
+        self.scale_min = min(self.scale_x, self.scale_y)
 
         self.state = self.STATE_INTRO_1
         self.finished = False
@@ -83,8 +84,27 @@ class MathEvent:
         self.success_text = "Well done! You receive the letter"
         self.failure_text = "That’s not 24 yet. Try again."
 
-        self.dialog_rect = self._scaled_rect(250, 170, 780, 280)
+        # Intro text layout (smaller font, no background panel)
+        intro_font_size = max(22, int(30 * self.scale_min))
+        self.intro_font = pygame.font.SysFont("Abyssinica SIL", intro_font_size)
+        if self.intro_font is None:
+            self.intro_font = pygame.font.SysFont(None, intro_font_size)
+        self.intro_line_height = max(int(self.intro_font.get_linesize() * 1.15), 24)
+        self.intro_rect = pygame.Rect(
+            int(160 * self.scale_x),
+            int(120 * self.scale_y),
+            int(960 * self.scale_x),
+            int(360 * self.scale_y),
+        )
+        instruction_font_size = max(18, int(26 * self.scale_min))
+        self.intro_instruction_font = pygame.font.SysFont(
+            "Abyssinica SIL", instruction_font_size
+        )
+        if self.intro_instruction_font is None:
+            self.intro_instruction_font = pygame.font.SysFont(None, instruction_font_size)
 
+        # Result dialog layout retains soft panel background
+        self.dialog_rect = self._scaled_rect(250, 170, 780, 280)
         self.dialog_font = SUBTITLE_FONT
         self.dialog_line_height = int(36 * self.scale_y)
 
@@ -104,15 +124,47 @@ class MathEvent:
         self.timer_expired = False
         self.digit_display_rects: List[pygame.Rect] = []
 
-        self.slot_rects = [
-            self._scaled_rect(199, 364, 87, 87),
-            self._scaled_rect(400, 364, 87, 87),
-            self._scaled_rect(641, 364, 87, 87),
-            self._scaled_rect(878, 364, 87, 87),
-        ]
-        self.panel_rect = self._scaled_rect(61, 340, 1157, 129)
-        self.submit_rect = self._scaled_rect(518, 634, 243, 78)
-        self.submit_inner_rect = self._scaled_rect(518, 643, 243, 60)
+        # Central puzzle layout
+        panel_width = max(int(900 * self.scale_x), 600)
+        panel_height = max(int(150 * self.scale_y), 110)
+        self.panel_rect = pygame.Rect(0, 0, panel_width, panel_height)
+        self.panel_rect.center = (
+            self.screen_width // 2,
+            self.screen_height // 2,
+        )
+
+        slot_side = max(int(96 * self.scale_min), 72)
+        self.slot_rects = []
+        slot_step = self.panel_rect.width / (len(self.slot_values) + 1)
+        for index in range(len(self.slot_values)):
+            center_x = self.panel_rect.left + slot_step * (index + 1)
+            rect = pygame.Rect(0, 0, slot_side, slot_side)
+            rect.center = (int(center_x), self.panel_rect.centery)
+            self.slot_rects.append(rect)
+
+        self.section_gap = max(int(90 * self.scale_y), 70)
+
+        submit_width = max(int(243 * self.scale_x), 200)
+        submit_height = max(int(78 * self.scale_y), 60)
+        self.submit_rect = pygame.Rect(0, 0, submit_width, submit_height)
+        self.submit_rect.center = (
+            self.screen_width // 2,
+            self.panel_rect.bottom + self.section_gap + submit_height // 2,
+        )
+        inner_height = max(submit_height - int(18 * self.scale_y), submit_height - 20)
+        inner_width = max(submit_width - int(24 * self.scale_x), submit_width - 24)
+        self.submit_inner_rect = pygame.Rect(
+            0,
+            0,
+            inner_width,
+            inner_height,
+        )
+        self.submit_inner_rect.center = self.submit_rect.center
+
+        self.timer_center = (
+            self.screen_width // 2,
+            max(int(90 * self.scale_y), self.panel_rect.top - self.section_gap),
+        )
 
         # Fonts for puzzle overlay
         base_operator_size = max(32, int(64 * self.scale_y))
@@ -125,7 +177,7 @@ class MathEvent:
         self.result_value_font = pygame.font.SysFont("Abyssinica SIL", max(48, int(89 * self.scale_y)))
         if self.result_value_font is None:
             self.result_value_font = pygame.font.SysFont(None, max(48, int(89 * self.scale_y)))
-        self.digit_font = pygame.font.SysFont("Inknut Antiqua", base_digit_size)
+        self.digit_font = pygame.font.SysFont("Abyssinica SIL", base_digit_size)
         if self.digit_font is None:
             self.digit_font = pygame.font.SysFont(None, base_digit_size)
         self.timer_font = pygame.font.SysFont("Abyssinica SIL", base_timer_size)
@@ -138,7 +190,7 @@ class MathEvent:
 
         # Pre-render text lines for intro and results.
         self.intro_lines: List[List[str]] = [
-            self._prepare_lines(text, self.dialog_font, self.dialog_rect.width)
+            self._prepare_lines(text, self.intro_font, self.intro_rect.width)
             for text in self.intro_texts
         ]
         self.result_lines_success = self._prepare_lines(
@@ -333,7 +385,7 @@ class MathEvent:
         if self.state in (self.STATE_INTRO_1, self.STATE_INTRO_2):
             self._draw_background(self.background_intro)
             index = 0 if self.state == self.STATE_INTRO_1 else 1
-            self._draw_dialog(self.intro_lines[index])
+            self._draw_intro(self.intro_lines[index])
             return
 
         if self.state == self.STATE_PUZZLE:
@@ -356,6 +408,26 @@ class MathEvent:
         else:
             self.screen.fill((255, 255, 255))
 
+    def _draw_intro(self, lines: Sequence[str]) -> None:
+        total_height = len(lines) * self.intro_line_height
+        start_y = self.intro_rect.top + max(0, (self.intro_rect.height - total_height) // 2)
+        for idx, line in enumerate(lines):
+            text_surface = self.intro_font.render(line, True, (255, 255, 255))
+            text_rect = text_surface.get_rect()
+            text_rect.centerx = self.intro_rect.centerx
+            text_rect.y = start_y + idx * self.intro_line_height
+            self.screen.blit(text_surface, text_rect)
+
+        instruction_surface = self.intro_instruction_font.render(
+            "Press SPACE or CLICK to continue", True, (255, 255, 255)
+        )
+        instruction_rect = instruction_surface.get_rect()
+        instruction_rect.center = (
+            self.screen_width // 2,
+            self.screen_height - int(50 * self.scale_y),
+        )
+        self.screen.blit(instruction_surface, instruction_rect)
+
     def _draw_dialog(self, lines: Sequence[str]) -> None:
         panel = pygame.Surface((self.dialog_rect.width, self.dialog_rect.height), pygame.SRCALPHA)
         panel.fill((255, 255, 255, 235))
@@ -377,19 +449,29 @@ class MathEvent:
         overlay.fill((217, 217, 217, int(0.6 * 255)))
         self.screen.blit(overlay, (0, 0))
 
-        panel = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
-        panel.fill((217, 217, 217, 255))
-        self.screen.blit(panel, self.panel_rect.topleft)
+        panel_surface = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(
+            panel_surface,
+            (217, 217, 217, 240),
+            panel_surface.get_rect(),
+            border_radius=15,
+        )
+        self.screen.blit(panel_surface, self.panel_rect.topleft)
 
         # Slot backgrounds
         for index, rect in enumerate(self.slot_rects):
             slot_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            slot_surface.fill((136, 103, 50, int(0.5 * 255)))
+            pygame.draw.rect(
+                slot_surface,
+                (136, 103, 50, int(0.55 * 255)),
+                slot_surface.get_rect(),
+                border_radius=12,
+            )
             self.screen.blit(slot_surface, rect.topleft)
             border_color = (0, 0, 0)
-            pygame.draw.rect(self.screen, border_color, rect, width=4)
+            pygame.draw.rect(self.screen, border_color, rect, width=3, border_radius=12)
             if self.selected_slot == index:
-                pygame.draw.rect(self.screen, (255, 215, 0), rect, width=4)
+                pygame.draw.rect(self.screen, (255, 215, 0), rect, width=4, border_radius=12)
 
         self._draw_puzzle_notation()
         self._draw_slot_values()
@@ -404,26 +486,32 @@ class MathEvent:
                 self._trigger_result(False)
 
     def _draw_puzzle_notation(self) -> None:
-        elements: List[Tuple[str, Tuple[float, float]]] = [
-            ("(", (69, 364)),
-            ("(", (119, 364)),
-            ("÷", (304, 359)),
-            (")", (487, 364)),
-            ("×", (553, 364)),
-            (")", (730, 364)),
-            ("×", (788, 364)),
-            ("=", (980, 364)),
-            ("24", (1046, 359)),
+        margin_small = max(int(24 * self.scale_x), 18)
+        margin_large = max(int(40 * self.scale_x), 24)
+        center_y = self.panel_rect.centery
+
+        def avg(a: int, b: int) -> int:
+            return (a + b) // 2
+
+        elements: List[Tuple[str, int]] = [
+            ("(", self.slot_rects[0].left - margin_large),
+            ("(", self.slot_rects[1].left - margin_small),
+            ("÷", avg(self.slot_rects[0].centerx, self.slot_rects[1].centerx)),
+            (")", self.slot_rects[1].right + margin_small),
+            ("×", avg(self.slot_rects[1].right, self.slot_rects[2].left)),
+            (")", self.slot_rects[2].right + margin_small),
+            ("×", avg(self.slot_rects[2].right, self.slot_rects[3].left)),
+            ("=", self.slot_rects[3].right + margin_large),
+            ("24", self.slot_rects[3].right + margin_large + max(int(60 * self.scale_x), 40)),
         ]
-        for symbol, (x, y) in elements:
-            pos_x = int(x * self.scale_x)
-            pos_y = int(y * self.scale_y)
+
+        for symbol, pos_x in elements:
             if symbol == "24":
                 surface = self.result_value_font.render(symbol, True, (0, 0, 0))
             else:
                 surface = self.operator_font.render(symbol, True, (0, 0, 0))
             rect = surface.get_rect()
-            rect.topleft = (pos_x, pos_y)
+            rect.center = (pos_x, center_y)
             self.screen.blit(surface, rect)
 
     def _draw_slot_values(self) -> None:
@@ -435,9 +523,10 @@ class MathEvent:
             self.screen.blit(text_surface, text_rect)
 
     def _draw_available_digits(self) -> None:
-        base_y = int(520 * self.scale_y)
-        spacing = int(80 * self.scale_x)
-        start_x = int(400 * self.scale_x)
+        base_y = (self.panel_rect.bottom + self.submit_rect.top) // 2
+        spacing = max(int(110 * self.scale_x), 80)
+        total_width = spacing * (len(self.DIGITS) - 1)
+        start_x = int(self.screen_width // 2 - total_width / 2)
         used_digits = {value for value in self.slot_values if value is not None}
         self.digit_display_rects = []
         for index, digit in enumerate(self.DIGITS):
@@ -455,18 +544,23 @@ class MathEvent:
             elapsed = pygame.time.get_ticks() - self.timer_start
             remaining = max(0, self.TIMER_LIMIT_MS - elapsed)
         seconds = max(0, remaining // 1000)
-        minutes = seconds // 60
-        seconds = seconds % 60
-        timer_text = f"{minutes:02d}:{seconds:02d}"
+        timer_text = f"{seconds:02d}"
         surface = self.timer_font.render(timer_text, True, (81, 62, 62))
-        rect = surface.get_rect(center=(self.screen_width // 2, int(120 * self.scale_y)))
+        rect = surface.get_rect(center=self.timer_center)
         self.screen.blit(surface, rect)
 
     def _draw_submit_button(self) -> None:
         pygame.draw.rect(self.screen, (176, 160, 134), self.submit_rect, border_radius=15)
-        pygame.draw.rect(self.screen, (109, 109, 109), self.submit_rect, width=4, border_radius=15)
-        inner_surface = pygame.Surface((self.submit_inner_rect.width, self.submit_inner_rect.height))
-        inner_surface.fill((176, 160, 134))
+        pygame.draw.rect(self.screen, (109, 109, 109), self.submit_rect, width=3, border_radius=15)
+        inner_surface = pygame.Surface(
+            (self.submit_inner_rect.width, self.submit_inner_rect.height), pygame.SRCALPHA
+        )
+        pygame.draw.rect(
+            inner_surface,
+            (205, 188, 160, 255),
+            inner_surface.get_rect(),
+            border_radius=12,
+        )
         self.screen.blit(inner_surface, self.submit_inner_rect.topleft)
 
         label = self.submit_font.render("SUBMIT", True, (0, 0, 0))

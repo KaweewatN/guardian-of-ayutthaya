@@ -30,9 +30,9 @@ except Exception:
 # Initialize pygame
 pygame.init()
 
-# Screen configuration
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720
+# Screen configuration - mirror the main game aspect ratio (1920x1080)
+SCREEN_WIDTH = int(os.environ.get("MATH_TEST_WIDTH", 1920))
+SCREEN_HEIGHT = int(os.environ.get("MATH_TEST_HEIGHT", 1080))
 BACKGROUND_COLOR = (255, 255, 255)
 BUTTON_COLOR = (220, 220, 220)
 BUTTON_HOVER_COLOR = (180, 180, 180)
