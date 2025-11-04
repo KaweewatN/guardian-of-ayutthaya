@@ -30,9 +30,9 @@ except Exception:
 # Initialize pygame
 pygame.init()
 
-# Screen configuration - mirror the main game aspect ratio (1920x1080)
-SCREEN_WIDTH = int(os.environ.get("MATH_TEST_WIDTH", 1920))
-SCREEN_HEIGHT = int(os.environ.get("MATH_TEST_HEIGHT", 1080))
+# Screen configuration - align with the mini-game test harness resolution (1280x832)
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 832
 BACKGROUND_COLOR = (255, 255, 255)
 BUTTON_COLOR = (220, 220, 220)
 BUTTON_HOVER_COLOR = (180, 180, 180)
@@ -83,7 +83,7 @@ def draw_selection_screen(screen, buttons):
 
 
 def main():
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen = pygame.display.set_mode((1280, 832))
     pygame.display.set_caption("Local Dev - Math Event")
 
     clock = pygame.time.Clock()
