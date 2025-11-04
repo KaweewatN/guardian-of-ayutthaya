@@ -312,7 +312,7 @@ class MathEvent:
         # Draw slots
         for slot in self.slots:
             rect: pygame.Rect = slot["rect"]
-            pygame.draw.rect(self.screen, self.BROWN, rect, width=4, border_radius=8)
+            pygame.draw.rect(self.screen, self.BROWN, rect, width=4)
             tile_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
             tile_surface.fill((136, 103, 50, 120))
             self.screen.blit(tile_surface, rect.topleft)
