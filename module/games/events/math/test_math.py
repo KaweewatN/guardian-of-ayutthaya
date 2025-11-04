@@ -3,6 +3,15 @@ import os
 import sys
 import importlib.util
 
+_builtin_math_spec = importlib.util.find_spec("math")
+if _builtin_math_spec and _builtin_math_spec.loader:
+    _builtin_math = importlib.util.module_from_spec(_builtin_math_spec)
+    sys.modules["math"] = _builtin_math
+    _builtin_math_spec.loader.exec_module(_builtin_math)
+else:  # pragma: no cover - fallback guard
+    import math as _builtin_math
+    sys.modules["math"] = _builtin_math
+
 import pygame
 
 # Attempt to import MathEvent similarly to other event test harnesses.

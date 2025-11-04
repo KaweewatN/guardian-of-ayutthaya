@@ -1,7 +1,40 @@
 """Math event mini-game implementation."""
+
+import importlib
+import importlib.util
 import os
 import sys
 from typing import List, Optional, Dict, Any
+
+
+def _ensure_std_math_module() -> None:
+    """Restore the stdlib ``math`` module when this file shadows it."""
+
+    existing = sys.modules.get("math")
+    if existing is not None and getattr(existing, "__file__", None) != __file__:
+        return
+
+    script_dir = os.path.abspath(os.path.dirname(__file__))
+    removed_entry: Optional[str] = None
+    if sys.path and os.path.abspath(sys.path[0]) == script_dir:
+        removed_entry = sys.path.pop(0)
+
+    previous = sys.modules.pop("math", None)
+    try:
+        std_math = importlib.import_module("math")
+    finally:
+        if removed_entry is not None:
+            sys.path.insert(0, removed_entry)
+
+    if getattr(std_math, "__file__", None) == __file__:
+        if previous is not None:
+            sys.modules["math"] = previous
+        return
+
+    sys.modules["math"] = std_math
+
+
+_ensure_std_math_module()
 
 import pygame
 
@@ -66,6 +99,7 @@ class MathEvent:
         self.operator_font = pygame.font.SysFont("Abyssinica SIL", 64)
         self.target_font = pygame.font.SysFont("Abyssinica SIL", 80)
         self.number_font = pygame.font.SysFont("Abyssinica SIL", 64)
+        self.timer_font = pygame.font.SysFont("Abyssinica SIL", 92)
 
         # Colors used in the puzzle overlay
         self.BLACK = (0, 0, 0)
@@ -89,7 +123,7 @@ class MathEvent:
         self.puzzle_bg = self._load_and_scale("assets/scene/empty/3.png")
 
         self.submit_rect = pygame.Rect(0, 0, 243, 60)
-        self.submit_rect.center = (self.screen_width // 2, 675)
+        self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.81))
         self.submit_button_img = self._load_button_image(
             "assets/scene/event/math/component/submit.png"
         )
@@ -100,9 +134,21 @@ class MathEvent:
             f"assets/scene/event/math/lose/{self.block_number}.png"
         )
 
+        # Layout metrics to keep puzzle content centered
+        self.slot_size = (110, 110)
+        self.tile_size = (100, 100)
+        self.slot_spacing = 150
+        self.tile_spacing = 150
+        self.slot_row_y = int(self.screen_height * 0.45)
+        self.tile_row_y = int(self.screen_height * 0.68)
+
         # Expression slots and selectable numbers
         self.slots = self._create_slots()
         self.number_tiles = self._create_number_tiles([2, 3, 4, 9])
+
+        # Countdown tracking
+        self.countdown_total_ms = 20000
+        self.countdown_start_ticks: Optional[int] = None
 
         # Instruction text surface reused for intro/result screens
         self._instruction_cache: Optional[pygame.Surface] = None
@@ -127,29 +173,53 @@ class MathEvent:
     # ------------------------------------------------------------------
     # Setup helpers
     # ------------------------------------------------------------------
-    def _create_slots(self) -> List[Dict[str, Any]]:
-        slot_positions = [
-            pygame.Rect(199, 364, 87, 87),
-            pygame.Rect(400, 364, 87, 87),
-            pygame.Rect(641, 364, 87, 87),
-            pygame.Rect(878, 364, 87, 87),
-        ]
+    def _calculate_centers(self, count: int, spacing: int, y: int) -> List[pygame.math.Vector2]:
+        if count <= 0:
+            return []
+        half_span = spacing * (count - 1) / 2
+        center_x = self.screen_width / 2
         return [
-            {"rect": rect, "value": None, "tile": None}
-            for rect in slot_positions
+            pygame.math.Vector2(center_x - half_span + index * spacing, y)
+            for index in range(count)
         ]
 
+    def _create_slots(self) -> List[Dict[str, Any]]:
+        centers = self._calculate_centers(4, self.slot_spacing, self.slot_row_y)
+        slots: List[Dict[str, Any]] = []
+        for center in centers:
+            rect = pygame.Rect(0, 0, *self.slot_size)
+            rect.center = (int(center.x), int(center.y))
+            slots.append({"rect": rect, "value": None, "tile": None})
+        return slots
+
     def _create_number_tiles(self, numbers: List[int]) -> List[Dict[str, Any]]:
-        tile_size = (87, 87)
-        start_x = 320
-        spacing = 120
-        y = 540
-        tiles = []
-        for index, number in enumerate(numbers):
-            rect = pygame.Rect(0, 0, *tile_size)
-            rect.center = (start_x + index * spacing, y)
+        centers = self._calculate_centers(len(numbers), self.tile_spacing, self.tile_row_y)
+        tiles: List[Dict[str, Any]] = []
+        for center, number in zip(centers, numbers):
+            rect = pygame.Rect(0, 0, *self.tile_size)
+            rect.center = (int(center.x), int(center.y))
             tiles.append({"rect": rect, "value": number, "selected": False})
         return tiles
+
+    def _scaled_rect(self, rect: pygame.Rect, scale: float) -> pygame.Rect:
+        new_width = int(rect.width * scale)
+        new_height = int(rect.height * scale)
+        scaled = pygame.Rect(0, 0, new_width, new_height)
+        scaled.center = rect.center
+        return scaled
+
+    def _recalculate_layout(self) -> None:
+        slot_centers = self._calculate_centers(len(self.slots), self.slot_spacing, self.slot_row_y)
+        for slot, center in zip(self.slots, slot_centers):
+            rect = pygame.Rect(0, 0, *self.slot_size)
+            rect.center = (int(center.x), int(center.y))
+            slot["rect"] = rect
+
+        tile_centers = self._calculate_centers(len(self.number_tiles), self.tile_spacing, self.tile_row_y)
+        for tile, center in zip(self.number_tiles, tile_centers):
+            rect = pygame.Rect(0, 0, *self.tile_size)
+            rect.center = (int(center.x), int(center.y))
+            tile["rect"] = rect
 
     # ------------------------------------------------------------------
     # Drawing helpers
@@ -180,31 +250,55 @@ class MathEvent:
         overlay.fill((217, 217, 217, 80))
         self.screen.blit(overlay, (0, 0))
 
-        equation_rect = pygame.Rect(61, 340, 1157, 129)
-        pygame.draw.rect(self.screen, (217, 217, 217), equation_rect, border_radius=15)
+        self._draw_countdown()
 
-        # Draw static equation symbols
-        equation_color = (81, 62, 62)
-        target_text = self.target_font.render("49", True, equation_color)
-        target_rect = target_text.get_rect(center=(self.screen_width // 2, 110))
-        self.screen.blit(target_text, target_rect)
+        slot_rects = [slot["rect"] for slot in self.slots]
+        if slot_rects:
+            left_bound = slot_rects[0].left - 120
+            right_bound = slot_rects[-1].right + 120
+            equation_rect = pygame.Rect(
+                left_bound,
+                slot_rects[0].top - 60,
+                right_bound - left_bound,
+                slot_rects[0].height + 120,
+            )
+            pygame.draw.rect(self.screen, (217, 217, 217), equation_rect, border_radius=20)
 
-        static_elements = [
-            {"text": "(", "pos": (95, 407)},
-            {"text": "(", "pos": (145, 407)},
-            {"text": ")", "pos": (525, 407)},
-            {"text": "÷", "pos": (330, 407)},
-            {"text": ")", "pos": (770, 407)},
-            {"text": "×", "pos": (590, 407)},
-            {"text": "×", "pos": (824, 407)},
-            {"text": "= 24", "pos": (1030, 407)},
-        ]
+            equation_color = (81, 62, 62)
+            text_positions = [
+                {"text": "(", "pos": (slot_rects[0].left - 70, slot_rects[0].centery)},
+                {"text": "(", "pos": (slot_rects[0].left - 30, slot_rects[0].centery)},
+                {
+                    "text": "÷",
+                    "pos": (
+                        (slot_rects[0].centerx + slot_rects[1].centerx) // 2,
+                        slot_rects[0].centery,
+                    ),
+                },
+                {"text": ")", "pos": (slot_rects[1].right + 30, slot_rects[1].centery)},
+                {
+                    "text": "×",
+                    "pos": (
+                        (slot_rects[1].right + slot_rects[2].left) // 2,
+                        slot_rects[2].centery,
+                    ),
+                },
+                {"text": ")", "pos": (slot_rects[2].right + 30, slot_rects[2].centery)},
+                {
+                    "text": "×",
+                    "pos": (
+                        (slot_rects[2].centerx + slot_rects[3].centerx) // 2,
+                        slot_rects[3].centery,
+                    ),
+                },
+                {"text": "= 24", "pos": (slot_rects[3].right + 80, slot_rects[3].centery)},
+            ]
 
-        for element in static_elements:
-            text_surface = self.operator_font.render(element["text"], True, self.BLACK)
-            rect = text_surface.get_rect()
-            rect.midleft = element["pos"]
-            self.screen.blit(text_surface, rect)
+            for element in text_positions:
+                text_surface = self.operator_font.render(element["text"], True, equation_color)
+                rect = text_surface.get_rect()
+                rect.center = element["pos"]
+                self.screen.blit(text_surface, rect)
 
         # Draw slots
         for slot in self.slots:
@@ -219,23 +313,36 @@ class MathEvent:
                 self.screen.blit(value_surface, value_rect)
 
         # Draw number tiles to choose from
+        mouse_pos = pygame.mouse.get_pos()
         for tile in self.number_tiles:
-            rect = tile["rect"]
+            base_rect = tile["rect"]
+            hover = base_rect.collidepoint(mouse_pos)
+            draw_rect = self._scaled_rect(base_rect, 1.08) if hover else base_rect
             color = self.BROWN_DIM if tile["selected"] else (136, 103, 50)
-            pygame.draw.rect(self.screen, color, rect, border_radius=10)
-            pygame.draw.rect(self.screen, self.BLACK, rect, width=3, border_radius=10)
+            if hover:
+                color = tuple(min(255, c + 25) for c in color)
+            pygame.draw.rect(self.screen, color, draw_rect, border_radius=14)
+            pygame.draw.rect(self.screen, self.BLACK, draw_rect, width=3, border_radius=14)
             value_surface = self.number_font.render(str(tile["value"]), True, self.BLACK)
-            value_rect = value_surface.get_rect(center=rect.center)
+            value_rect = value_surface.get_rect(center=draw_rect.center)
             self.screen.blit(value_surface, value_rect)
 
         # Draw submit button
+        submit_hover = self.submit_rect.collidepoint(mouse_pos)
+        submit_draw_rect = self._scaled_rect(self.submit_rect, 1.08) if submit_hover else self.submit_rect
         if self.submit_button_img:
-            self.screen.blit(self.submit_button_img, self.submit_rect)
+            button_surface = self.submit_button_img
+            if submit_hover:
+                button_surface = pygame.transform.smoothscale(
+                    self.submit_button_img, submit_draw_rect.size
+                )
+            self.screen.blit(button_surface, submit_draw_rect)
         else:
-            pygame.draw.rect(self.screen, self.BROWN_DIM, self.submit_rect, border_radius=15)
-            pygame.draw.rect(self.screen, self.BLACK, self.submit_rect, width=3, border_radius=15)
+            base_color = tuple(min(255, c + 25) for c in self.BROWN_DIM) if submit_hover else self.BROWN_DIM
+            pygame.draw.rect(self.screen, base_color, submit_draw_rect, border_radius=18)
+            pygame.draw.rect(self.screen, self.BLACK, submit_draw_rect, width=3, border_radius=18)
             submit_text = self.button_font.render("SUBMIT", True, self.BLACK)
-            submit_rect = submit_text.get_rect(center=self.submit_rect.center)
+            submit_rect = submit_text.get_rect(center=submit_draw_rect.center)
             self.screen.blit(submit_text, submit_rect)
 
     def draw_result(self) -> None:
@@ -258,6 +365,7 @@ class MathEvent:
         elif self.state == self.STATE_INTRO_TWO:
             self.draw_intro_screen(self.intro_two_bg)
         elif self.state == self.STATE_PUZZLE:
+            self._update_countdown()
             self.draw_puzzle()
         elif self.state == self.STATE_RESULT:
             self.draw_result()
@@ -268,7 +376,7 @@ class MathEvent:
                 if self.state == self.STATE_INTRO_ONE:
                     self.state = self.STATE_INTRO_TWO
                 elif self.state == self.STATE_INTRO_TWO:
-                    self.state = self.STATE_PUZZLE
+                    self._enter_puzzle()
                 elif self.state == self.STATE_RESULT:
                     return self._finalize_result()
 
@@ -276,7 +384,7 @@ class MathEvent:
             if self.state == self.STATE_INTRO_ONE:
                 self.state = self.STATE_INTRO_TWO
             elif self.state == self.STATE_INTRO_TWO:
-                self.state = self.STATE_PUZZLE
+                self._enter_puzzle()
             elif self.state == self.STATE_PUZZLE:
                 self._handle_puzzle_click(event.pos)
             elif self.state == self.STATE_RESULT:
@@ -327,6 +435,7 @@ class MathEvent:
         self.puzzle_result = self.RESULT_WIN if result == 24 else self.RESULT_LOSE
         self.state = self.STATE_RESULT
         self._result_reported = False
+        self._stop_countdown()
 
     def _finalize_result(self) -> Optional[Dict[str, Any]]:
         if self.state != self.STATE_RESULT or self._result_reported:
@@ -351,10 +460,71 @@ class MathEvent:
             slot["tile"] = None
         for tile in self.number_tiles:
             tile["selected"] = False
+        self._stop_countdown()
 
     def update_screen_size(self, screen: pygame.Surface) -> None:
         self.screen = screen
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
+        self.slot_row_y = int(self.screen_height * 0.45)
+        self.tile_row_y = int(self.screen_height * 0.68)
         self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.81))
+        self._recalculate_layout()
         # Rescaling assets is skipped for now to keep implementation focused on gameplay logic.
+
+    # ------------------------------------------------------------------
+    # Countdown helpers
+    # ------------------------------------------------------------------
+    def _enter_puzzle(self) -> None:
+        self.state = self.STATE_PUZZLE
+        self._start_countdown()
+
+    def _start_countdown(self) -> None:
+        self.countdown_start_ticks = pygame.time.get_ticks()
+
+    def _stop_countdown(self) -> None:
+        self.countdown_start_ticks = None
+
+    def _get_countdown_ms(self) -> int:
+        if self.countdown_start_ticks is None:
+            return self.countdown_total_ms
+        elapsed = pygame.time.get_ticks() - self.countdown_start_ticks
+        return max(0, self.countdown_total_ms - elapsed)
+
+    def _update_countdown(self) -> None:
+        if self.state != self.STATE_PUZZLE:
+            return
+        if self.countdown_start_ticks is None:
+            self._start_countdown()
+        if self._get_countdown_ms() <= 0:
+            self._handle_timeout()
+
+    def _handle_timeout(self) -> None:
+        if self.state != self.STATE_PUZZLE:
+            return
+        self.puzzle_result = self.RESULT_LOSE
+        self.state = self.STATE_RESULT
+        self._result_reported = False
+        self._stop_countdown()
+
+    def _draw_countdown(self) -> None:
+        remaining_ms = self._get_countdown_ms()
+        seconds_left = max(0, (remaining_ms + 999) // 1000)
+        label_color = (81, 62, 62)
+        label_surface = self.subtitle_font.render("Time Left", True, label_color)
+        label_rect = label_surface.get_rect(
+            center=(self.screen_width // 2, int(self.screen_height * 0.18))
+        )
+        self.screen.blit(label_surface, label_rect)
+
+        timer_rect = pygame.Rect(0, 0, 220, 130)
+        timer_rect.center = (
+            self.screen_width // 2,
+            label_rect.bottom + 70,
+        )
+        pygame.draw.rect(self.screen, (245, 237, 223), timer_rect, border_radius=32)
+        pygame.draw.rect(self.screen, self.BROWN, timer_rect, width=4, border_radius=32)
+
+        timer_surface = self.timer_font.render(str(seconds_left), True, self.BROWN)
+        timer_text_rect = timer_surface.get_rect(center=timer_rect.center)
+        self.screen.blit(timer_surface, timer_text_rect)
