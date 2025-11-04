@@ -99,7 +99,7 @@ class MathEvent:
         self.operator_font = pygame.font.SysFont("Abyssinica SIL", 64)
         self.target_font = pygame.font.SysFont("Abyssinica SIL", 80)
         self.number_font = pygame.font.SysFont("Abyssinica SIL", 64)
-        self.timer_font = pygame.font.SysFont("Abyssinica SIL", 92)
+        self.timer_font = pygame.font.SysFont("Abyssinica SIL", 78)
 
         # Colors used in the puzzle overlay
         self.BLACK = (0, 0, 0)
@@ -123,7 +123,7 @@ class MathEvent:
         self.puzzle_bg = self._load_and_scale("assets/scene/empty/3.png")
 
         self.submit_rect = pygame.Rect(0, 0, 243, 60)
-        self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.81))
+        self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.86))
         self.submit_button_img = self._load_button_image(
             "assets/scene/event/math/component/submit.png"
         )
@@ -135,12 +135,12 @@ class MathEvent:
         )
 
         # Layout metrics to keep puzzle content centered
-        self.slot_size = (110, 110)
-        self.tile_size = (100, 100)
-        self.slot_spacing = 150
+        self.slot_size = (96, 96)
+        self.tile_size = (88, 88)
+        self.slot_spacing = 160
         self.tile_spacing = 150
-        self.slot_row_y = int(self.screen_height * 0.45)
-        self.tile_row_y = int(self.screen_height * 0.68)
+        self.slot_row_y = int(self.screen_height * 0.44)
+        self.tile_row_y = int(self.screen_height * 0.74)
 
         # Expression slots and selectable numbers
         self.slots = self._create_slots()
@@ -254,46 +254,44 @@ class MathEvent:
 
         slot_rects = [slot["rect"] for slot in self.slots]
         if slot_rects:
-            left_bound = slot_rects[0].left - 120
-            right_bound = slot_rects[-1].right + 120
+            horizontal_span = slot_rects[-1].right - slot_rects[0].left
             equation_rect = pygame.Rect(
-                left_bound,
-                slot_rects[0].top - 60,
-                right_bound - left_bound,
-                slot_rects[0].height + 120,
+                slot_rects[0].left - 150,
+                slot_rects[0].centery - 64,
+                horizontal_span + 300,
+                128,
             )
             pygame.draw.rect(self.screen, (217, 217, 217), equation_rect, border_radius=20)
 
-            equation_color = (81, 62, 62)
+            equation_color = self.BLACK
             text_positions = [
-                {"text": "(", "pos": (slot_rects[0].left - 70, slot_rects[0].centery)},
-                {"text": "(", "pos": (slot_rects[0].left - 30, slot_rects[0].centery)},
-                {
-                    "text": "÷",
-                    "pos": (
-                        (slot_rects[0].centerx + slot_rects[1].centerx) // 2,
-                        slot_rects[0].centery,
-                    ),
-                },
-                {"text": ")", "pos": (slot_rects[1].right + 30, slot_rects[1].centery)},
-                {
-                    "text": "×",
-                    "pos": (
-                        (slot_rects[1].right + slot_rects[2].left) // 2,
-                        slot_rects[2].centery,
-                    ),
-                },
-                {"text": ")", "pos": (slot_rects[2].right + 30, slot_rects[2].centery)},
-                {
-                    "text": "×",
-                    "pos": (
-                        (slot_rects[2].centerx + slot_rects[3].centerx) // 2,
-                        slot_rects[3].centery,
-                    ),
-                },
-                {"text": "= 24", "pos": (slot_rects[3].right + 80, slot_rects[3].centery)},
-            ]
+                # Opening brackets before first slot
+                {"text": "(",  "pos": (slot_rects[0].left  - 95, slot_rects[0].centery)},
+                {"text": "(",  "pos": (slot_rects[0].left  - 55, slot_rects[0].centery)},
 
+                # Between slot 0 and 1
+                {"text": "÷",  "pos": (
+                    (slot_rects[0].centerx + slot_rects[1].centerx) // 2,
+                    slot_rects[0].centery,
+                )},
+                {"text": ")",  "pos": (slot_rects[1].right + 55, slot_rects[1].centery)},
+
+                # Between slot 1 and 2
+                {"text": "×",  "pos": (
+                    (slot_rects[1].right + slot_rects[2].left) // 2,
+                    slot_rects[2].centery,
+                )},
+                {"text": ")",  "pos": (slot_rects[2].right + 55, slot_rects[2].centery)},
+
+                # Between slot 2 and 3
+                {"text": "×",  "pos": (
+                    (slot_rects[2].centerx + slot_rects[3].centerx) // 2,
+                    slot_rects[3].centery,
+                )},
+
+                # Final result
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, slot_rects[3].centery)},
+            ]
             for element in text_positions:
                 text_surface = self.operator_font.render(element["text"], True, equation_color)
                 rect = text_surface.get_rect()
@@ -466,9 +464,9 @@ class MathEvent:
         self.screen = screen
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
-        self.slot_row_y = int(self.screen_height * 0.45)
-        self.tile_row_y = int(self.screen_height * 0.68)
-        self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.81))
+        self.slot_row_y = int(self.screen_height * 0.44)
+        self.tile_row_y = int(self.screen_height * 0.74)
+        self.submit_rect.center = (self.screen_width // 2, int(self.screen_height * 0.86))
         self._recalculate_layout()
         # Rescaling assets is skipped for now to keep implementation focused on gameplay logic.
 
@@ -510,20 +508,11 @@ class MathEvent:
     def _draw_countdown(self) -> None:
         remaining_ms = self._get_countdown_ms()
         seconds_left = max(0, (remaining_ms + 999) // 1000)
-        label_color = (81, 62, 62)
-        label_surface = self.subtitle_font.render("Time Left", True, label_color)
-        label_rect = label_surface.get_rect(
-            center=(self.screen_width // 2, int(self.screen_height * 0.18))
-        )
-        self.screen.blit(label_surface, label_rect)
-
-        timer_rect = pygame.Rect(0, 0, 220, 130)
-        timer_rect.center = (
-            self.screen_width // 2,
-            label_rect.bottom + 70,
-        )
-        pygame.draw.rect(self.screen, (245, 237, 223), timer_rect, border_radius=32)
-        pygame.draw.rect(self.screen, self.BROWN, timer_rect, width=4, border_radius=32)
+        timer_rect = pygame.Rect(0, 0, 190, 100)
+        timer_rect.centerx = self.screen_width // 2
+        timer_rect.top = int(self.screen_height * 0.05)
+        pygame.draw.rect(self.screen, (245, 237, 223), timer_rect, border_radius=28)
+        pygame.draw.rect(self.screen, self.BROWN, timer_rect, width=4, border_radius=28)
 
         timer_surface = self.timer_font.render(str(seconds_left), True, self.BROWN)
         timer_text_rect = timer_surface.get_rect(center=timer_rect.center)
