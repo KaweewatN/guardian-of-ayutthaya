@@ -72,7 +72,7 @@ except Exception:
 
 
 class MathEvent:
-    """Math puzzle event for the Ayutthaya project (button 3 implementation)."""
+    """Math puzzle event for the Ayutthaya project (buttons 3 and 11 implementation)."""
 
     STATE_INTRO_ONE = "intro_one"
     STATE_INTRO_TWO = "intro_two"
@@ -119,8 +119,8 @@ class MathEvent:
         self.intro_two_bg = self._load_and_scale(
             f"assets/scene/event/math/intro2/{self.block_number}.png"
         )
-        # Puzzle background is a shared asset for the math event
-        self.puzzle_bg = self._load_and_scale("assets/scene/empty/3.png")
+        # Puzzle background can vary per block; fall back to button 3 asset if missing
+        self.puzzle_bg = self._load_puzzle_background()
         self.padding_y = int(self.screen_height * 0.05)
         self.submit_rect = pygame.Rect(0, 0, 243, 60)
         self.submit_rect.centerx = self.screen_width // 2
@@ -183,6 +183,26 @@ class MathEvent:
             return None
         image = pygame.image.load(path)
         return pygame.transform.scale(image, self.submit_rect.size)
+
+    def _load_puzzle_background(self) -> Optional[pygame.Surface]:
+        """Load the puzzle background for the current block with a safe fallback."""
+
+        candidate_paths = [
+            f"assets/scene/empty/{self.block_number}.png",
+            "assets/scene/empty/3.png",
+        ]
+
+        for path in candidate_paths:
+            if not os.path.exists(path):
+                continue
+            background = self._load_and_scale(path)
+            if background is not None:
+                return background
+
+        print(
+            f"Warning: missing puzzle background for math event block {self.block_number}"
+        )
+        return None
 
     # ------------------------------------------------------------------
     # Setup helpers
