@@ -126,8 +126,8 @@ def main():
                         if button["rect"].collidepoint(event.pos):
                             label = button["label"]
                             print(f"Button {label} clicked")
-                            if label == "3":
-                                math_event = MathEvent(screen, block_number=3)
+                            if label in {"3", "11"}:
+                                math_event = MathEvent(screen, block_number=int(label))
                                 math_event_result = None
                                 math_event_end_time = 0
                             break
