@@ -16,7 +16,8 @@ from game_start.game_start import GameStart
 from stories import Stories
 from character_select.character_select import CharacterSelect
 from board.board import Board
-from ui.quit_button import QuitButton
+from ui.sound_button import SoundButton
+from ui.settings_button import SettingsButton
 from events.rock_paper_scissors.rock_paper_scissors import RockPaperScissors
 from events.guess.guess import GuessGame
 from game_state import game_state
@@ -47,7 +48,7 @@ class Game:
         # Create windowed mode with specified size
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.screen_width, self.screen_height = SCREEN_WIDTH, SCREEN_HEIGHT
-        pygame.display.set_caption("Story Game")
+        pygame.display.set_caption("Guardian of Ayutthaya")
 
         # Game state
         self.clock = pygame.time.Clock()
@@ -70,36 +71,37 @@ class Game:
         )
 
         self.instruction_font = pygame.font.SysFont('Times New Roman', 24, bold=True)
-        # Reusable quit button UI (positioned on left side with 10px padding)
-        self.quit_button = QuitButton(self.screen, position='left', margin_x=10)
+        # Sound toggle button (positioned on left side with 60px padding)
+        self.sound_button = SoundButton(self.screen, position='left', margin_x=60, quit_button_width=0)
+        # Settings button with popup (positioned on right side) - includes quit and restart
+        self.settings_button = SettingsButton(self.screen, position='left', margin_x=30)
         
     def handle_events(self):
         """Handle all game events"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-
-            # Let the quit button process the event (returns True if clicked)
+            
+            # Let the sound button process the event
             try:
-                if self.quit_button.handle_event(event):
+                self.sound_button.handle_event(event)
+            except Exception:
+                pass
+            
+            # Let the settings button process the event (returns 'quit' or 'restart')
+            try:
+                settings_result = self.settings_button.handle_event(event)
+                if settings_result == 'quit':
                     self.running = False
+                    return
+                elif settings_result == 'restart':
+                    self.restart_game()
                     return
             except Exception:
                 pass
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if self.game_state == "stories":
-                        self.game_state = "menu"
-                        self.stories.reset()
-                    elif self.game_state == "character_select":
-                        self.game_state = "menu"
-                    elif self.game_state == "board":
-                        self.game_state = "menu"
-                    else:
-                        self.running = False
-
-                elif event.key == pygame.K_SPACE and self.game_state == "stories":
+                if event.key == pygame.K_SPACE and self.game_state == "stories":
                     # Manual skip
                     advanced = self.stories.advance_story(self.clock)
                     if not advanced and self.stories.finished:
@@ -140,11 +142,17 @@ class Game:
                     advanced = self.stories.advance_story(self.clock)
                     if not advanced and self.stories.finished:
                         self.game_state = "character_select"
-            # (quit handled above by quit_button.handle_event)
+            # (quit handled by settings_button.handle_event)
             # No VIDEORESIZE handling needed
                     
     def update(self):
         """Update game logic"""
+        # Update sound button (checks if music needs to restart)
+        try:
+            self.sound_button.update()
+        except Exception:
+            pass
+        
         if self.game_state == "board":
             try:
                 self.board.update()
@@ -172,10 +180,15 @@ class Game:
         while running_rps and self.running:
             self.clock.tick(FPS)
             for event in pygame.event.get():
-                # Allow quit button to work while in mini-game
+                # Allow settings button to work while in mini-game
                 try:
-                    if self.quit_button.handle_event(event):
+                    settings_result = self.settings_button.handle_event(event)
+                    if settings_result == 'quit':
                         self.running = False
+                        running_rps = False
+                        break
+                    elif settings_result == 'restart':
+                        self.restart_game()
                         running_rps = False
                         break
                 except Exception:
@@ -190,9 +203,9 @@ class Game:
 
             # Draw mini-game
             rps.draw()
-            # Draw quit button on top
+            # Draw settings button on top
             try:
-                self.quit_button.draw()
+                self.settings_button.draw()
             except Exception:
                 pass
             pygame.display.flip()
@@ -215,10 +228,15 @@ class Game:
         while running_guess and self.running:
             self.clock.tick(FPS)
             for event in pygame.event.get():
-                # Allow quit button to work while in mini-game
+                # Allow settings button to work while in mini-game
                 try:
-                    if self.quit_button.handle_event(event):
+                    settings_result = self.settings_button.handle_event(event)
+                    if settings_result == 'quit':
                         self.running = False
+                        running_guess = False
+                        break
+                    elif settings_result == 'restart':
+                        self.restart_game()
                         running_guess = False
                         break
                 except Exception:
@@ -233,9 +251,9 @@ class Game:
 
             # Draw mini-game
             guess.draw()
-            # Draw quit button on top
+            # Draw settings button on top
             try:
-                self.quit_button.draw()
+                self.settings_button.draw()
             except Exception:
                 pass
             pygame.display.flip()
@@ -255,9 +273,9 @@ class Game:
         elif self.game_state == "stories":
             self.stories.draw_story(self.stories.current_story)
 
-            # Draw ESC instruction (bigger font, lower position)
+            # Draw instruction (bigger font, lower position)
             instruction_text = self.instruction_font.render(
-                "Press ESC to return to menu | SPACE or CLICK to skip", True, WHITE)
+                "SPACE or CLICK to skip", True, WHITE)
             instruction_rect = instruction_text.get_rect(
                 center=(self.screen_width // 2, self.screen_height + 70)
             )
@@ -270,9 +288,15 @@ class Game:
             self.screen.blit(s, bg_rect)
             self.screen.blit(instruction_text, instruction_rect)
 
-        # Draw reusable quit button (always on top)
+        # Draw sound button (always on top)
         try:
-            self.quit_button.draw()
+            self.sound_button.draw()
+        except Exception:
+            pass
+        
+        # Draw settings button (always on top, right side)
+        try:
+            self.settings_button.draw()
         except Exception:
             pass
 
@@ -287,9 +311,33 @@ class Game:
             self.draw()
             
         self.quit()
+    
+    def restart_game(self):
+        """Restart the game by resetting all components to initial state"""
+        print("Restarting game...")
+        
+        # Reset game state
+        self.game_state = "menu"
+        
+        # Reset global game state
+        game_state.reset()
+        
+        # Reinitialize modules
+        self.menu = GameStart(self.screen)
+        self.character_select = CharacterSelect(self.screen)
+        self.board = Board(self.screen)
+        self.stories.reset()
+        
+        print("Game restarted successfully!")
         
     def quit(self):
         """Clean up and quit"""
+        # Cleanup sound
+        try:
+            self.sound_button.cleanup()
+        except Exception:
+            pass
+        
         pygame.quit()
         sys.exit()
 

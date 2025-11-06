@@ -10,7 +10,7 @@ from typing import Optional
 
 import pygame
 
-from block_scenes_config import get_block_scene_sequence
+from block_scenes_config import get_block_scene_sequence, get_block_jump_destination
 from scene_viewer import SceneViewer
 
 # Add module directory to path for game_state import
@@ -80,7 +80,7 @@ class BoardBlock:
     
     Game Events:
     - Math Game: Blocks 3, 11, 20, 28, 37, 43, 49, 54
-    - Rock Paper Scissors: Blocks 2, 6, 17, 40, 46, 57
+    - Rock Paper Scissors: Blocks 6, 17, 40, 46, 57
     - Guess Game: Blocks 9, 14, 31, 51
     """
     
@@ -102,6 +102,10 @@ class BoardBlock:
         self.screen = screen
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
+        
+        # Loading state - prevent interactions before everything is ready
+        self.is_fully_loaded = False
+        self.is_transitioning = False  # Prevents actions during state transitions
         
         # Current block position (1-indexed)
         self.current_block = start_block
@@ -126,7 +130,7 @@ class BoardBlock:
         self.scene_viewer = None
         self.viewing_scenes = False
         self.scene_delay_timer = 0
-        self.scene_delay_duration = 2000  # 1 second delay before showing scenes (in milliseconds)
+        self.scene_delay_duration = 5000  # 5 second delay before showing scenes (in milliseconds)
         self.pending_scenes = False
         self.cached_scenes = None
         
@@ -136,11 +140,14 @@ class BoardBlock:
         
         # Define game event blocks
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
-        self.rps_blocks = [6, 17, 2, 40, 46, 57]  # Rock Paper Scissors (fixed: removed 25, added 2)
+        self.rps_blocks = [6, 17, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
         
         # Show scenes for the starting block
         self.show_block_scenes()
+        
+        # Mark as fully loaded after initialization
+        self.is_fully_loaded = True
         
     def load_board_images(self):
         """Load board-block-1 and board-block-2 from assets/core folder."""
@@ -300,15 +307,40 @@ class BoardBlock:
         Returns:
             bool: True if successful, False otherwise
         """
+        # Safety check: prevent movement if not fully loaded or transitioning
+        if not self.is_fully_loaded or self.is_transitioning:
+            return False
+        
+        # Prevent movement if viewing scenes or playing game
+        if self.viewing_scenes or self.playing_game or self.pending_scenes:
+            return False
+        
         if self.current_block in self.blocks_info:
             next_block = self.blocks_info[self.current_block]['next']
             if next_block:
+                # Lock state during transition
+                self.is_transitioning = True
+                
                 self.current_block = next_block
                 self.update_character_position()
-                # Show scenes for the new block only if requested
+                
+                # Only check for special block jumps when this is the final landing (show_scenes=True)
+                # This ensures jumps only trigger when you land exactly on the block, not when passing through
                 if show_scenes:
+                    jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
+                    if jump_destination:
+                        # Move to the jump destination
+                        self.current_block = jump_destination
+                        self.update_character_position()
+                    
+                    # Show scenes for the new block (after jump if applicable)
                     self.show_block_scenes()
+                
+                # Unlock state after transition
+                self.is_transitioning = False
                 return True
+        
+        self.is_transitioning = False
         return False
     
     def move_backward(self, show_scenes=True):
@@ -321,15 +353,40 @@ class BoardBlock:
         Returns:
             bool: True if successful, False otherwise
         """
+        # Safety check: prevent movement if not fully loaded or transitioning
+        if not self.is_fully_loaded or self.is_transitioning:
+            return False
+        
+        # Prevent movement if viewing scenes or playing game
+        if self.viewing_scenes or self.playing_game or self.pending_scenes:
+            return False
+        
         if self.current_block in self.blocks_info:
             prev_block = self.blocks_info[self.current_block]['prev']
             if prev_block:
+                # Lock state during transition
+                self.is_transitioning = True
+                
                 self.current_block = prev_block
                 self.update_character_position()
-                # Show scenes for the new block only if requested
+                
+                # Only check for special block jumps when this is the final landing (show_scenes=True)
+                # This ensures jumps only trigger when you land exactly on the block, not when passing through
                 if show_scenes:
+                    jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
+                    if jump_destination:
+                        # Move to the jump destination
+                        self.current_block = jump_destination
+                        self.update_character_position()
+                    
+                    # Show scenes for the new block (after jump if applicable)
                     self.show_block_scenes()
+                
+                # Unlock state after transition
+                self.is_transitioning = False
                 return True
+        
+        self.is_transitioning = False
         return False
     
     def move_to_block(self, block_number):
@@ -342,13 +399,39 @@ class BoardBlock:
         Returns:
             bool: True if successful, False if invalid block
         """
+        # Safety check: prevent movement if not fully loaded or transitioning
+        if not self.is_fully_loaded or self.is_transitioning:
+            return False
+        
+        # Prevent movement if viewing scenes or playing game
+        if self.viewing_scenes or self.playing_game or self.pending_scenes:
+            return False
+        
         if block_number in self.blocks_info:
+            # Lock state during transition
+            self.is_transitioning = True
+            
             self.current_block = block_number
             self.update_character_position()
+            
+            # Check for special block jumps (from_jump=False because this is normal movement)
+            jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
+            if jump_destination:
+                # Move to the jump destination
+                self.current_block = jump_destination
+                self.update_character_position()
+            
             # Show scenes for the new block
             self.show_block_scenes()
+            
+            # Unlock state after transition
+            self.is_transitioning = False
             return True
+        
+        self.is_transitioning = False
         return False
+    
+    
     
     def show_block_scenes(self):
         """Show the scene sequence for the current block with delay."""
@@ -368,11 +451,31 @@ class BoardBlock:
             self.cached_scenes = None
     
     def check_and_start_game_event(self):
-        """Check if current block triggers a game event and start it."""
+        """
+        Check if current block triggers a game event and start it.
+        
+        This method is idempotent and safe to call multiple times.
+        It includes safety checks to prevent:
+        - Starting multiple games simultaneously
+        - Starting games during scene viewing or transitions
+        
+        Called from:
+        1. update() - When scenes finish automatically (timer-based)
+        2. handle_event() - When scenes are skipped by user input
+        """
+        # Safety checks: Don't start a new game if one is already active or system is busy
+        if self.playing_game or self.current_game is not None:
+            return
+        
+        # Don't start game during transitions or if viewing scenes
+        if self.is_transitioning or self.viewing_scenes or self.pending_scenes:
+            return
+        
         if self.current_block in self.math_blocks:
             if MathEvent is None:
                 print(f"Warning: MathEvent unavailable for block {self.current_block}")
                 return
+            print(f"Starting Math game at block {self.current_block}")
             self.current_game = MathEvent(self.screen, self.current_block)
             self.playing_game = True
             return
@@ -381,6 +484,7 @@ class BoardBlock:
             if RockPaperScissors is None:
                 print(f"Warning: RockPaperScissors unavailable for block {self.current_block}")
                 return
+            print(f"Starting Rock-Paper-Scissors game at block {self.current_block}")
             self.current_game = RockPaperScissors(self.screen, self.current_block)
             self.playing_game = True
             return
@@ -389,6 +493,7 @@ class BoardBlock:
             if GuessGame is None:
                 print(f"Warning: GuessGame unavailable for block {self.current_block}")
                 return
+            print(f"Starting Guess game at block {self.current_block}")
             self.current_game = GuessGame(self.screen, self.current_block)
             self.playing_game = True
     
@@ -404,11 +509,12 @@ class BoardBlock:
         # Update scene viewer if active
         if self.viewing_scenes and self.scene_viewer:
             self.scene_viewer.update()
-            # Check if scene viewing is finished
+            # Check if scene viewing is finished (auto-advance by timer)
             if self.scene_viewer.is_finished:
                 self.viewing_scenes = False
                 self.scene_viewer = None
-                # After scenes finish, check if we should start a game event
+                # After scenes finish automatically, check if we should start a game event
+                # Note: If finished by user input, this is handled in handle_event()
                 self.check_and_start_game_event()
     
     def get_block_info(self, block_number=None):
@@ -537,6 +643,10 @@ class BoardBlock:
         Returns:
             dict: Movement result or None
         """
+        # Safety check: prevent any input handling if not fully loaded
+        if not self.is_fully_loaded:
+            return None
+        
         # If playing a game event, forward events to game
         if self.playing_game and self.current_game:
             result = self.current_game.handle_event(event)
@@ -553,6 +663,13 @@ class BoardBlock:
             if finished:
                 self.viewing_scenes = False
                 self.scene_viewer = None
+                # Important: Check and start game event immediately after scenes finish
+                # This ensures games start properly even when scenes are skipped via input
+                self.check_and_start_game_event()
+            return None
+        
+        # Block input during transitions or pending scenes
+        if self.is_transitioning or self.pending_scenes:
             return None
         
         if event.type == pygame.KEYDOWN:
@@ -576,6 +693,21 @@ class BoardBlock:
             dict: Complete blocks information
         """
         return self.blocks_info.copy()
+    
+    def is_ready_for_input(self):
+        """
+        Check if the board is ready to accept user input.
+        
+        Returns:
+            bool: True if board can accept input, False otherwise
+        """
+        return (
+            self.is_fully_loaded and
+            not self.is_transitioning and
+            not self.viewing_scenes and
+            not self.playing_game and
+            not self.pending_scenes
+        )
 
 
 # Example usage / testing

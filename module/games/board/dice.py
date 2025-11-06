@@ -126,6 +126,12 @@ class Dice:
     
     def start_roll(self):
         """Start the dice rolling animation."""
+        # Safety check: only allow rolling if board is ready
+        if hasattr(self.board_block, 'is_ready_for_input'):
+            if not self.board_block.is_ready_for_input():
+                print("Board not ready for dice roll")
+                return
+        
         if not self.is_rolling and not self.is_moving:
             self.is_rolling = True
             self.animation_start_time = pygame.time.get_ticks()
@@ -235,8 +241,13 @@ class Dice:
     
     def draw_button(self):
         """Draw the roll dice button."""
+        # Check board state
+        board_ready = True
+        if hasattr(self.board_block, 'is_ready_for_input'):
+            board_ready = self.board_block.is_ready_for_input()
+        
         # Determine button state
-        can_roll = not self.is_rolling and not self.is_moving
+        can_roll = board_ready and not self.is_rolling and not self.is_moving
         
         # Choose button color
         if not can_roll:
@@ -258,6 +269,8 @@ class Dice:
             text = "Rolling..."
         elif self.is_moving:
             text = f"Moving ({self.steps_remaining})"
+        elif not board_ready:
+            text = "Wait..."
         else:
             text = "Roll Dice"
         
@@ -310,6 +323,11 @@ class Dice:
         Returns:
             dict: Action result or None
         """
+        # Safety check: respect board state
+        board_ready = True
+        if hasattr(self.board_block, 'is_ready_for_input'):
+            board_ready = self.board_block.is_ready_for_input()
+        
         if event.type == pygame.MOUSEMOTION:
             # Check if mouse is hovering over button
             self.is_button_hovered = self.button_rect.collidepoint(event.pos)
@@ -318,15 +336,15 @@ class Dice:
             if event.button == 1:  # Left click
                 # Check if clicked on button
                 if self.button_rect.collidepoint(event.pos):
-                    # Only allow rolling if not currently rolling or moving
-                    if not self.is_rolling and not self.is_moving:
+                    # Only allow rolling if board is ready and not currently rolling or moving
+                    if board_ready and not self.is_rolling and not self.is_moving:
                         self.start_roll()
                         return {'action': 'dice_rolled'}
         
         elif event.type == pygame.KEYDOWN:
-            # Allow spacebar to roll dice as well
+            # Allow spacebar to roll dice as well (only if board is ready)
             if event.key == pygame.K_SPACE:
-                if not self.is_rolling and not self.is_moving:
+                if board_ready and not self.is_rolling and not self.is_moving:
                     self.start_roll()
                     return {'action': 'dice_rolled'}
         

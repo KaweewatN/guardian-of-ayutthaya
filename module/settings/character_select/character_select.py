@@ -62,7 +62,7 @@ class CharacterSelect:
         self.BLACK = (0, 0, 0)
         self.WHITE = (255, 255, 255)
         self.GOLD = (200, 155, 91)
-        self.DARK_GOLD = (168, 107, 39)
+        self.DARK_GOLD = (115, 73, 26)
         
         # State
         self.selected_character = None

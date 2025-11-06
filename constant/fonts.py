@@ -29,6 +29,7 @@ class Fonts:
         DICE_BUTTON_FONT = pygame.font.Font(inknut_bold, 26)
         TITLE_FONT = pygame.font.Font(inknut_bold, 72)
         TEXT_FONT_BOLD = pygame.font.Font(inknut_bold, 24)
+        HINT_FONT = pygame.font.Font(inknut_bold, 16)
     else:
         # Fallback to Baskerville (similar classic serif font on macOS)
         print("Warning: Inknut Antiqua font files not found, using Baskerville as fallback")
@@ -37,6 +38,7 @@ class Fonts:
         BUTTON_FONT_SMALL = pygame.font.SysFont('Baskerville', 36, bold=True)
         TITLE_FONT = pygame.font.SysFont('Baskerville', 72, bold=True)
         TEXT_FONT_BOLD = pygame.font.SysFont('Baskerville', 24, bold=True)
+        HINT_FONT = pygame.font.SysFont('Baskerville', 16, bold=True)
     
     if os.path.exists(inknut_regular):
         # Use font file for regular fonts
@@ -88,6 +90,7 @@ TITLE_FONT = Fonts.TITLE_FONT
 SUBTITLE_FONT = Fonts.SUBTITLE_FONT
 TEXT_FONT = Fonts.TEXT_FONT
 TEXT_FONT_BOLD = Fonts.TEXT_FONT_BOLD
+HINT_FONT = Fonts.HINT_FONT
 
 # Character selection fonts
 CHARACTER_TITLE_FONT = Fonts.CHARACTER_TITLE_FONT

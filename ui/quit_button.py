@@ -22,9 +22,9 @@ class QuitButton:
       qb.draw()
     """
 
-    def __init__(self, screen, width=110, height=40, margin_x=30, margin_y=20,
-                 color=(180, 50, 50), hover_color=(220, 80, 80),
-                 border=(120, 30, 30), text_color=(255, 255, 255),
+    def __init__(self, screen, width=110, height=40, margin_x=30, margin_y=25,
+                 color=(139, 90, 43), hover_color=(180, 120, 60),
+                 border=(90, 60, 30), text_color=(255, 255, 255),
                  font_name='Arial', font_size=20, bold=True, position='left'):
         self.screen = screen
         self.width = width

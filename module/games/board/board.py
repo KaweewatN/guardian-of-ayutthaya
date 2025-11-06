@@ -197,14 +197,19 @@ class Board:
 
         # If in board mode, forward events to board_block and dice
         if self.ui_mode == 'board':
+            # Check if board is ready for input
+            board_ready = hasattr(self.board_block, 'is_ready_for_input') and self.board_block.is_ready_for_input()
+            
             # Handle dice events first (dice takes priority)
+            # Dice will check board state internally
             dice_result = self.dice.handle_event(event)
             if dice_result:
                 # Dice action occurred
                 pass
             
-            # Only handle board events if dice is not active (not rolling or moving)
-            if not self.dice.is_active():
+            # Only handle board events if dice is not active AND board is ready
+            # This prevents conflicts during dice rolling/movement
+            if not self.dice.is_active() and (board_ready or self.board_block.viewing_scenes or self.board_block.playing_game):
                 result = self.board_block.handle_event(event)
                 if result:
                     # Handle block movement results if needed

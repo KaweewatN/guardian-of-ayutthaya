@@ -65,6 +65,52 @@ def get_all_blocks_config():
     return config
 
 
+def get_block_jump_destination(block_number, from_jump=False):
+    """
+    Get the destination block for special block jumps.
+    
+    Args:
+        block_number: Current block number
+        from_jump: If True, indicates this block was reached via a jump (prevents chain jumping)
+        
+    Returns:
+        int or None: Destination block number if there's a special jump, None otherwise
+    """
+    # If we arrived at this block via a jump, don't trigger another jump
+    # This prevents infinite loops and chain jumping
+    if from_jump:
+        return None
+    
+    # Forward jumps (ladders/portals that move you ahead)
+    forward_jumps = {
+        3: 6,
+        27: 35,
+        38: 42,
+        50: 55
+    }
+    
+    # Backward jumps (snakes/traps that move you back)
+    backward_jumps = {
+        13: 8,
+        21: 16,
+        30: 23,
+        35: 28,
+        44: 38,
+        55: 49
+    }
+    
+    # Check forward jumps first
+    if block_number in forward_jumps:
+        return forward_jumps[block_number]
+    
+    # Check backward jumps
+    if block_number in backward_jumps:
+        return backward_jumps[block_number]
+    
+    # No special jump for this block
+    return None
+
+
 # For debugging/reference
 if __name__ == "__main__":
     print("Block Scenes Configuration")
@@ -79,3 +125,19 @@ if __name__ == "__main__":
     
     print("\n" + "=" * 60)
     print(f"Total blocks configured: {len(get_all_blocks_config())}")
+    
+    # Show special block jumps
+    print("\n" + "=" * 60)
+    print("Special Block Jumps:")
+    print("-" * 60)
+    
+    print("\nForward Jumps (Ladders/Portals):")
+    for block in [3, 27, 38, 50]:
+        dest = get_block_jump_destination(block)
+        print(f"  Block {block} -> Block {dest}")
+    
+    print("\nBackward Jumps (Snakes/Traps):")
+    for block in [13, 21, 30, 35, 44, 55]:
+        dest = get_block_jump_destination(block)
+        print(f"  Block {block} -> Block {dest}")
+

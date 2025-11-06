@@ -53,14 +53,8 @@ class GameStart:
         bg_path = "assets/core/home.png"
         if os.path.exists(bg_path):
             img = pygame.image.load(bg_path)
-            img_rect = img.get_rect()
-            scale_factor = min(
-                self.screen_width / img_rect.width,
-                self.screen_height / img_rect.height
-            )
-            new_width = int(img_rect.width * scale_factor)
-            new_height = int(img_rect.height * scale_factor)
-            self.background = pygame.transform.scale(img, (new_width, new_height))
+            # Scale to fill entire screen with no padding
+            self.background = pygame.transform.scale(img, (self.screen_width, self.screen_height))
         else:
             print(f"Warning: {bg_path} not found")
             self.background = None
@@ -69,16 +63,9 @@ class GameStart:
         """Draw the start menu"""
         self.screen.fill(self.BLACK)
         
-        # Draw background
+        # Draw background filling entire screen
         if self.background:
-            bg_rect = self.background.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
-            # Create darkened version
-            darkened = self.background.copy()
-            dark_overlay = pygame.Surface(darkened.get_size())
-            dark_overlay.fill(self.BLACK)
-            dark_overlay.set_alpha(20)
-            darkened.blit(dark_overlay, (0, 0))
-            self.screen.blit(darkened, bg_rect)
+            self.screen.blit(self.background, (0, 0))
         
         # Draw start button
         color = self.BUTTON_HOVER_COLOR if self.button_hovered else self.BUTTON_COLOR

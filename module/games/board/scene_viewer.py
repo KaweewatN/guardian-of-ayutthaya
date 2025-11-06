@@ -26,7 +26,7 @@ class SceneViewer:
             screen: Pygame display surface
             scenes_list: List of scene dictionaries from block_scenes_config
                         Each dict has: {'folder': str, 'filename': str, 'type': str}
-            scene_duration: Duration in milliseconds to show each scene (default: 5000ms = 5 seconds)
+            scene_duration: Duration in milliseconds to show each scene (default: 5000 = 5 seconds)
         """
         self.screen = screen
         self.screen_width = screen.get_width()
@@ -47,6 +47,10 @@ class SceneViewer:
         # Auto-transition timer
         self.scene_duration = scene_duration
         self.scene_start_time = pygame.time.get_ticks()
+        
+        # Debouncing - prevent rapid input
+        self.last_input_time = 0
+        self.input_cooldown = 300  # 300ms cooldown between inputs
         
         # Smaller font for UI text
         self.small_font = TEXT_FONT
@@ -166,18 +170,26 @@ class SceneViewer:
         Returns:
             bool: True if scene viewing is finished, False otherwise
         """
+        # Debouncing: check if enough time has passed since last input
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_input_time < self.input_cooldown:
+            return False  # Ignore input if within cooldown period
+        
         if event.type == pygame.KEYDOWN:
             # Next scene or finish with SPACE or ENTER
             if event.key in (pygame.K_SPACE, pygame.K_RETURN):
+                self.last_input_time = current_time
                 self.next_scene()
                 return self.is_finished
             # Skip all scenes with ESC
             elif event.key == pygame.K_ESCAPE:
+                self.last_input_time = current_time
                 self.is_finished = True
                 return True
         
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left click anywhere on screen
+                self.last_input_time = current_time
                 self.next_scene()
                 return self.is_finished
         
