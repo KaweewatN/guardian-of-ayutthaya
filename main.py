@@ -72,7 +72,7 @@ class Game:
 
         self.instruction_font = pygame.font.SysFont('Times New Roman', 24, bold=True)
         # Sound toggle button (positioned on left side with 60px padding)
-        self.sound_button = SoundButton(self.screen, position='left', margin_x=60, quit_button_width=0)
+        self.sound_button = SoundButton(self.screen, position='left', margin_x=70, quit_button_width=0)
         # Settings button with popup (positioned on right side) - includes quit and restart
         self.settings_button = SettingsButton(self.screen, position='left', margin_x=30)
         
