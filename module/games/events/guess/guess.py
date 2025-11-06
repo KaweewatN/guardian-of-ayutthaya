@@ -75,6 +75,7 @@ class GuessGame:
         # Fonts
         self.title_font = BUTTON_FONT_LARGE
         self.subtitle_font = SUBTITLE_FONT
+        self.current_question_font = SUBTITLE_FONT
         self.text_font = TEXT_FONT
         self.small_font = TEXT_FONT
         self.button_font = BUTTON_FONT

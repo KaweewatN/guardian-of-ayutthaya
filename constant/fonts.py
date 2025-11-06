@@ -25,7 +25,8 @@ class Fonts:
         # Use font file for bold fonts
         BUTTON_FONT = pygame.font.Font(inknut_bold, 48)
         BUTTON_FONT_LARGE = pygame.font.Font(inknut_bold, 56)
-        BUTTON_FONT_SMALL = pygame.font.Font(inknut_bold, 36)
+        BUTTON_FONT_SMALL = pygame.font.Font(inknut_bold, 22)
+        DICE_BUTTON_FONT = pygame.font.Font(inknut_bold, 26)
         TITLE_FONT = pygame.font.Font(inknut_bold, 72)
         TEXT_FONT_BOLD = pygame.font.Font(inknut_bold, 24)
     else:
@@ -45,6 +46,23 @@ class Fonts:
         # Fallback
         SUBTITLE_FONT = pygame.font.SysFont('Baskerville', 48, bold=False)
         TEXT_FONT = pygame.font.SysFont('Baskerville', 24, bold=False)
+    
+    # Character selection fonts
+    if os.path.exists(inknut_bold):
+        CHARACTER_TITLE_FONT = pygame.font.Font(inknut_bold, 48)
+        CHARACTER_NAME_FONT = pygame.font.Font(inknut_bold, 20)
+        CHARACTER_EMOJI_FONT = pygame.font.Font(inknut_regular if os.path.exists(inknut_regular) else inknut_bold, 40)
+    else:
+        CHARACTER_TITLE_FONT = pygame.font.SysFont('Arial', 48, bold=True)
+        CHARACTER_NAME_FONT = pygame.font.SysFont('Arial', 20, bold=True)
+        CHARACTER_EMOJI_FONT = pygame.font.SysFont('Arial', 40)
+    
+    if os.path.exists(inknut_regular):
+        CHARACTER_INTRO_FONT = pygame.font.Font(inknut_regular, 16)
+        CHARACTER_INSTRUCTION_FONT = pygame.font.Font(inknut_regular, 20)
+    else:
+        CHARACTER_INTRO_FONT = pygame.font.SysFont('Arial', 16)
+        CHARACTER_INSTRUCTION_FONT = pygame.font.SysFont('Arial', 20)
     
     @staticmethod
     def get_button_font():
@@ -70,3 +88,13 @@ TITLE_FONT = Fonts.TITLE_FONT
 SUBTITLE_FONT = Fonts.SUBTITLE_FONT
 TEXT_FONT = Fonts.TEXT_FONT
 TEXT_FONT_BOLD = Fonts.TEXT_FONT_BOLD
+
+# Character selection fonts
+CHARACTER_TITLE_FONT = Fonts.CHARACTER_TITLE_FONT
+CHARACTER_NAME_FONT = Fonts.CHARACTER_NAME_FONT
+CHARACTER_INTRO_FONT = Fonts.CHARACTER_INTRO_FONT
+CHARACTER_EMOJI_FONT = Fonts.CHARACTER_EMOJI_FONT
+CHARACTER_INSTRUCTION_FONT = Fonts.CHARACTER_INSTRUCTION_FONT
+
+# Dice button font
+DICE_BUTTON_FONT = Fonts.DICE_BUTTON_FONT

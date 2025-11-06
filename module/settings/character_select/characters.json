@@ -1,0 +1,32 @@
+{
+  "characters": [
+    {
+      "id": 1,
+      "name": "Plai Dum",
+      "intro": "A kind-hearted young elephant who loves nature and believes friendship can overcome any obstacle.",
+      "image": "elephant-1.png",
+      "color": [150, 150, 150]
+    },
+    {
+      "id": 2,
+      "name": "Changda",
+      "intro": "A brave elephant clad in golden armor, protector of the weak, and fearless in battle.",
+      "image": "elephant-2.png",
+      "color": [255, 180, 50]
+    },
+    {
+      "id": 3,
+      "name": "Mae Noi",
+      "intro": "A swift, mysterious assassin elephant who moves unseen, striking only for justice and honor.",
+      "image": "elephant-3.png",
+      "color": [50, 50, 80]
+    },
+    {
+      "id": 4,
+      "name": "Nai Pao",
+      "intro": "A fiery elephant fighter mastering ancient Muay Thai moves, always smiling even in fierce combat.",
+      "image": "elephant-4.png",
+      "color": [255, 80, 80]
+    }
+  ]
+}

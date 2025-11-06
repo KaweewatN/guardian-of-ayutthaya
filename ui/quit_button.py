@@ -1,4 +1,13 @@
 import pygame
+import os
+import sys
+
+# Add constant directory to path for fonts import
+_CONSTANT_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'constant'))
+if _CONSTANT_BASE not in sys.path:
+    sys.path.insert(0, _CONSTANT_BASE)
+
+from fonts import BUTTON_FONT_SMALL
 
 
 class QuitButton:
@@ -6,17 +15,17 @@ class QuitButton:
 
     Usage:
       qb = QuitButton(screen)
-      # inside event loop:
+      # inside event loop:c
       if qb.handle_event(event):
           # clicked -> perform quit action
       # after drawing the scene:
       qb.draw()
     """
 
-    def __init__(self, screen, width=110, height=40, margin_x=70, margin_y=20,
+    def __init__(self, screen, width=110, height=40, margin_x=30, margin_y=20,
                  color=(180, 50, 50), hover_color=(220, 80, 80),
                  border=(120, 30, 30), text_color=(255, 255, 255),
-                 font_name='Arial', font_size=20, bold=True):
+                 font_name='Arial', font_size=20, bold=True, position='left'):
         self.screen = screen
         self.width = width
         self.height = height
@@ -26,18 +35,30 @@ class QuitButton:
         self.hover_color = hover_color
         self.border = border
         self.text_color = text_color
-        self.font = pygame.font.SysFont(font_name, font_size, bold=bold)
+        # Use centralized font system
+        self.font = BUTTON_FONT_SMALL
         self.hover = False
+        self.position = position  # 'left' or 'right'
         self._recompute_rect()
 
     def _recompute_rect(self):
         sw = self.screen.get_width()
-        self.rect = pygame.Rect(
-            sw - self.margin_x - self.width,
-            self.margin_y,
-            self.width,
-            self.height,
-        )
+        if self.position == 'left':
+            # Position on left side
+            self.rect = pygame.Rect(
+                self.margin_x,
+                self.margin_y,
+                self.width,
+                self.height,
+            )
+        else:
+            # Position on right side (original behavior)
+            self.rect = pygame.Rect(
+                sw - self.margin_x - self.width,
+                self.margin_y,
+                self.width,
+                self.height,
+            )
 
     def handle_event(self, event):
         """Handle pygame events. Returns True if the quit button was clicked."""
@@ -73,6 +94,6 @@ class QuitButton:
         qb_color = self.hover_color if self.hover else self.color
         pygame.draw.rect(self.screen, qb_color, self.rect, border_radius=6)
         pygame.draw.rect(self.screen, self.border, self.rect, 2, border_radius=6)
-        qb_text = self.font.render("QUIT", True, self.text_color)
+        qb_text = self.font.render("Quit", True, self.text_color)
         qb_rect = qb_text.get_rect(center=self.rect.center)
         self.screen.blit(qb_text, qb_rect)

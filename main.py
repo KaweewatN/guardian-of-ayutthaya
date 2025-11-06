@@ -8,23 +8,27 @@ import os
 
 # Add module directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'module', 'games'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'module', 'settings'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'module'))
 
 # Import game modules
 from game_start.game_start import GameStart
 from stories import Stories
+from character_select.character_select import CharacterSelect
 from board.board import Board
 from ui.quit_button import QuitButton
 from events.rock_paper_scissors.rock_paper_scissors import RockPaperScissors
 from events.guess.guess import GuessGame
+from game_state import game_state
 
 # Initialize Pygame
 pygame.init()
 
 # ==================== CONFIGURATION ====================
 # Screen settings
-FULLSCREEN = True
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1080
+FULLSCREEN = False
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 832
 
 # Colors
 BLACK = (0, 0, 0)
@@ -40,18 +44,19 @@ class Game:
     
     def __init__(self):
         """Initialize the game"""
-        # Always use fullscreen with fixed size
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
+        # Create windowed mode with specified size
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.screen_width, self.screen_height = SCREEN_WIDTH, SCREEN_HEIGHT
         pygame.display.set_caption("Story Game")
 
         # Game state
         self.clock = pygame.time.Clock()
         self.running = True
-        self.game_state = "menu"  # Start at the menu (start button)
+        self.game_state = "menu"  # Flow: menu -> stories -> character_select -> board
 
         # Initialize modules
         self.menu = GameStart(self.screen)
+        self.character_select = CharacterSelect(self.screen)
         self.board = Board(self.screen)
 
         colors_config = {'BLACK': BLACK, 'WHITE': WHITE}
@@ -65,8 +70,8 @@ class Game:
         )
 
         self.instruction_font = pygame.font.SysFont('Times New Roman', 24, bold=True)
-        # Reusable quit button UI
-        self.quit_button = QuitButton(self.screen)
+        # Reusable quit button UI (positioned on left side with 10px padding)
+        self.quit_button = QuitButton(self.screen, position='left', margin_x=10)
         
     def handle_events(self):
         """Handle all game events"""
@@ -87,6 +92,8 @@ class Game:
                     if self.game_state == "stories":
                         self.game_state = "menu"
                         self.stories.reset()
+                    elif self.game_state == "character_select":
+                        self.game_state = "menu"
                     elif self.game_state == "board":
                         self.game_state = "menu"
                     else:
@@ -96,7 +103,7 @@ class Game:
                     # Manual skip
                     advanced = self.stories.advance_story(self.clock)
                     if not advanced and self.stories.finished:
-                        self.game_state = "board"
+                        self.game_state = "character_select"
 
             # Mouse events
             if self.game_state == "menu":
@@ -104,6 +111,21 @@ class Game:
                     # Start button pressed -> show stories first
                     self.stories.reset()
                     self.game_state = "stories"
+            elif self.game_state == "character_select":
+                result = self.character_select.handle_event(event)
+                if result:
+                    if result.get('confirmed'):
+                        # Character selected - save to global state and go to board
+                        game_state.set_character(
+                            result['character_id'],
+                            result['character_data']
+                        )
+                        # Reload the character image in the board
+                        self.board.reload_character()
+                        self.game_state = "board"
+                    elif result.get('cancelled'):
+                        # Go back to menu
+                        self.game_state = "menu"
             elif self.game_state == "board":
                 if self.board.handle_event(event):
                     # Launch the rock-paper-scissors mini-game (blocking until finished)
@@ -113,22 +135,30 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     advanced = self.stories.advance_story(self.clock)
                     if not advanced and self.stories.finished:
-                        self.game_state = "board"
+                        self.game_state = "character_select"
                 elif event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     advanced = self.stories.advance_story(self.clock)
                     if not advanced and self.stories.finished:
-                        self.game_state = "board"
+                        self.game_state = "character_select"
             # (quit handled above by quit_button.handle_event)
             # No VIDEORESIZE handling needed
                     
     def update(self):
         """Update game logic"""
-        if self.game_state == "stories":
+        if self.game_state == "board":
+            try:
+                self.board.update()
+            except Exception as exc:
+                print(f"Warning: Board update failed: {exc}")
+        elif self.game_state == "character_select":
+            # Update character selection animations
+            self.character_select.update()
+        elif self.game_state == "stories":
             # Check if it's time to auto-advance
             if self.stories.should_advance():
                 advanced = self.stories.advance_story(self.clock)
                 if not advanced and self.stories.finished:
-                    self.game_state = "board"
+                    self.game_state = "character_select"
 
     def run_rock_paper_scissors(self, block_number=6):
         """Run the RockPaperScissors mini-game in a blocking loop until it returns a result."""
@@ -217,6 +247,8 @@ class Game:
         """Draw the current game state"""
         if self.game_state == "menu":
             self.menu.draw()
+        elif self.game_state == "character_select":
+            self.character_select.draw()
         elif self.game_state == "board":
             self.screen.fill(BLACK)
             self.board.draw()
