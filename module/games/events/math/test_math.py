@@ -51,7 +51,7 @@ FONT_SIZE = 36
 FPS = 60
 
 # Numbers to display on buttons
-BUTTON_LABELS = [3, 11, 20, 28, 37, 43, 49, 53]
+BUTTON_LABELS = [3, 11, 20, 28, 37, 43, 49, 54]
 RESULT_DISPLAY_MS = 1200
 
 
@@ -126,7 +126,7 @@ def main():
                         if button["rect"].collidepoint(event.pos):
                             label = button["label"]
                             print(f"Button {label} clicked")
-                            if label in {"3", "11", "20", "28", "37", "43", "49", "53"}:
+                            if label in {"3", "11", "20", "28", "37", "43", "49", "54"}:
                                 math_event = MathEvent(screen, block_number=int(label))
                                 math_event_result = None
                                 math_event_end_time = 0
