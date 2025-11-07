@@ -34,7 +34,8 @@ _EVENTS_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'ev
 def _load_event_class(module_name: str, relative_path: str, class_name: str) -> Optional[type]:
     """Safely load an event class without colliding with stdlib modules."""
     if _EVENTS_BASE not in sys.path:
-        sys.path.insert(0, _EVENTS_BASE)
+        # Append instead of inserting at front to avoid shadowing stdlib names like random
+        sys.path.append(_EVENTS_BASE)
 
     module_path = os.path.join(_EVENTS_BASE, *relative_path.split('/'))
     if not os.path.exists(module_path):
@@ -68,7 +69,7 @@ RockPaperScissors = _load_event_class(
     'RockPaperScissors'
 )
 GuessGame = _load_event_class('events.guess.guess', 'guess/guess.py', 'GuessGame')
-RandomCard = _load_event_class('events.random.random_event', 'random/random_event.py', 'RandomCard')
+RandomCard = _load_event_class('random.random_event', 'random/random_event.py', 'RandomCard')
 
 
 class BoardBlock:
