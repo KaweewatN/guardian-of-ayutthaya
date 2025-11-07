@@ -461,6 +461,14 @@ class MathEvent:
                 {"text": "+", "pos": (mid_x(slot_rects[3], slot_rects[4]), mid_y)},
                 {"text": "= 24", "pos": (slot_rects[-1].right + 90, mid_y)},
             ]
+        if self.block_number == 20:
+            return [
+                {"text": "×", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": "− (", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 45, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 135, mid_y)},
+            ]
 
         return [
             {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
@@ -492,6 +500,14 @@ class MathEvent:
             self.tile_spacing = 110
             self.solution_checker = self._check_solution_block11
             return
+        if self.block_number == 20:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = list(range(0, 11))
+            self.allow_tile_reuse = False
+            self.tile_spacing = 110
+            self.solution_checker = self._check_solution_block20
+            return
 
         self.slot_count = 4
         self.slot_spacing = 160
@@ -514,6 +530,11 @@ class MathEvent:
             return False
         n1, n2, n3, n4, n5 = values
         return n1 + n2 - n3 + n4 + n5 == 24
+    def _check_solution_block20(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        return (n1 * n2) - (n3 + n4) == 24
 
     def _finalize_result(self) -> Optional[Dict[str, Any]]:
         if self.state != self.STATE_RESULT or self._result_reported:
