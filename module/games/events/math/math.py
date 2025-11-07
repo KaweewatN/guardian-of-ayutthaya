@@ -459,6 +459,59 @@ class MathEvent:
                 {"text": ")", "pos": (slot_rects[3].right + 45, mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 135, mid_y)},
             ]
+        if self.block_number == 28:
+            return [
+                {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 55, mid_y)},
+                {"text": "+", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
+                {"text": "÷", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+            ]
+        if self.block_number == 37:
+            return [
+                {"text": "×", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": "(", "pos": (slot_rects[1].left - 55, mid_y)},
+                {"text": "−", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
+                {"text": "−", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+            ]
+        if self.block_number == 43:
+            return [
+                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "÷", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+            ]
+        if self.block_number == 49:
+            return [
+                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "×", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+            ]
+        if self.block_number == 54:
+            return [
+                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+            ]
 
         return [
             {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
@@ -498,6 +551,46 @@ class MathEvent:
             self.tile_spacing = 150
             self.solution_checker = self._check_solution_block20
             return
+        if self.block_number == 28:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = [2, 3, 3, 8]
+            self.allow_tile_reuse = False
+            self.tile_spacing = 150
+            self.solution_checker = self._check_solution_block28
+            return
+        if self.block_number == 37:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = [3, 7, 8, 8]
+            self.allow_tile_reuse = False
+            self.tile_spacing = 150
+            self.solution_checker = self._check_solution_block37
+            return
+        if self.block_number == 43:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = [1, 5, 6, 9]
+            self.allow_tile_reuse = False
+            self.tile_spacing = 150
+            self.solution_checker = self._check_solution_block43
+            return
+        if self.block_number == 49:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = [2, 5, 6, 7]
+            self.allow_tile_reuse = False
+            self.tile_spacing = 150
+            self.solution_checker = self._check_solution_block49
+            return
+        if self.block_number == 54:
+            self.slot_count = 4
+            self.slot_spacing = 160
+            self.number_choices = [2, 2, 3, 9]
+            self.allow_tile_reuse = False
+            self.tile_spacing = 150
+            self.solution_checker = self._check_solution_block54
+            return
 
         self.slot_count = 4
         self.slot_spacing = 160
@@ -525,6 +618,42 @@ class MathEvent:
             return False
         n1, n2, n3, n4 = values
         return (n1 * n2) - (n3 + n4) == 24
+
+    def _check_solution_block28(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        try:
+            return ((n1 + n2) * n3) / n4 == 24
+        except ZeroDivisionError:
+            return False
+
+    def _check_solution_block37(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        return (n1 * (n2 - n3)) - n4 == 24
+
+    def _check_solution_block43(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        try:
+            return (n1 - n2) * (n3 / n4) == 24
+        except ZeroDivisionError:
+            return False
+
+    def _check_solution_block49(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        return (n1 - n2) * (n3 * n4) == 24
+
+    def _check_solution_block54(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        return (n1 - n2) * (n3 + n4) == 24
 
     def _finalize_result(self) -> Optional[Dict[str, Any]]:
         if self.state != self.STATE_RESULT or self._result_reported:
