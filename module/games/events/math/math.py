@@ -4,7 +4,7 @@ import importlib
 import importlib.util
 import os
 import sys
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 
 
 def _ensure_std_math_module() -> None:
@@ -141,6 +141,13 @@ class MathEvent:
         self.slot_spacing = 160
         self.tile_spacing = 150
 
+        # Puzzle configuration (varies by block/button)
+        self.slot_count = 4
+        self.number_choices: List[int] = []
+        self.allow_tile_reuse = False
+        self.solution_checker: Callable[[List[int]], bool] = self._check_solution_default
+        self._configure_puzzle_settings()
+
         # Equal top/bottom padding for timer and submit button
         self.padding_y = int(self.screen_height * 0.05)  # top gap == bottom gap
 
@@ -157,8 +164,8 @@ class MathEvent:
         self.equation_bg_border_c = self.BROWN
 
         # Expression slots and selectable numbers
-        self.slots = self._create_slots()
-        self.number_tiles = self._create_number_tiles([2, 3, 4, 9])
+        self.slots = self._create_slots(self.slot_count)
+        self.number_tiles = self._create_number_tiles(self.number_choices)
 
         # Countdown tracking
         self.countdown_total_ms = 20000
@@ -217,8 +224,8 @@ class MathEvent:
             for index in range(count)
         ]
 
-    def _create_slots(self) -> List[Dict[str, Any]]:
-        centers = self._calculate_centers(4, self.slot_spacing, self.slot_row_y)
+    def _create_slots(self, count: int) -> List[Dict[str, Any]]:
+        centers = self._calculate_centers(count, self.slot_spacing, self.slot_row_y)
         slots: List[Dict[str, Any]] = []
         for center in centers:
             rect = pygame.Rect(0, 0, *self.slot_size)
@@ -301,28 +308,7 @@ class MathEvent:
 
         # --- Cleaner mid section: consistent Y, tidy helpers ---
         mid_y = slot_rects[0].centery
-        def mid_x(a: pygame.Rect, b: pygame.Rect) -> int:
-            return (a.centerx + b.centerx) // 2
-
-        text_positions = [
-            # Opening brackets before first slot
-            {"text": "(",   "pos": (slot_rects[0].left  - 95,  mid_y)},
-            {"text": "(",   "pos": (slot_rects[0].left  - 55,  mid_y)},
-
-            # Between slot 0 and 1
-            {"text": "÷",   "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-            {"text": ")",   "pos": (slot_rects[1].right + 55,  mid_y)},
-
-            # Between slot 1 and 2
-            {"text": "×",   "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-            {"text": ")",   "pos": (slot_rects[2].right + 55,  mid_y)},
-
-            # Between slot 2 and 3
-            {"text": "×",   "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-
-            # Final result
-            {"text": "= 24","pos": (slot_rects[3].right + 125, mid_y)},
-        ]
+        text_positions = self._get_expression_text_positions(slot_rects)
         for element in text_positions:
             text_surface = self.operator_font.render(element["text"], True, equation_color)
             rect = text_surface.get_rect()
@@ -347,8 +333,9 @@ class MathEvent:
             base_rect = tile["rect"]
             hover = base_rect.collidepoint(mouse_pos)
             draw_rect = self._scaled_rect(base_rect, 1.08) if hover else base_rect
-            color = self.BROWN_DIM if tile["selected"] else (136, 103, 50)
-            if hover:
+            color = (136, 103, 50)
+            if not self.allow_tile_reuse and tile["selected"]:
+                color = self.BROWN_DIM
                 color = tuple(min(255, c + 25) for c in color)
             pygame.draw.rect(self.screen, color, draw_rect, border_radius=14)
             pygame.draw.rect(self.screen, self.BLACK, draw_rect, width=3, border_radius=14)
@@ -436,7 +423,7 @@ class MathEvent:
             rect: pygame.Rect = slot["rect"]
             if rect.collidepoint(pos) and slot["value"] is not None:
                 tile = slot["tile"]
-                if tile:
+                if tile and not self.allow_tile_reuse:
                     tile["selected"] = False
                 slot["value"] = None
                 slot["tile"] = None
@@ -444,27 +431,89 @@ class MathEvent:
 
         # Otherwise check number tiles to select
         for tile in self.number_tiles:
-            if tile["rect"].collidepoint(pos) and not tile["selected"]:
-                for slot in self.slots:
-                    if slot["value"] is None:
-                        slot["value"] = tile["value"]
+            if not tile["rect"].collidepoint(pos):
+                continue
+            if not self.allow_tile_reuse and tile["selected"]:
+                continue
+            for slot in self.slots:
+                if slot["value"] is None:
+                    slot["value"] = tile["value"]
+                    slot["tile"] = None
+                    if not self.allow_tile_reuse:
                         slot["tile"] = tile
                         tile["selected"] = True
-                        return
+                    return
+
+    def _get_expression_text_positions(self, slot_rects: List[pygame.Rect]) -> List[Dict[str, Any]]:
+        if not slot_rects:
+            return []
+
+        mid_y = slot_rects[0].centery
+
+        def mid_x(a: pygame.Rect, b: pygame.Rect) -> int:
+            return (a.centerx + b.centerx) // 2
+
+        if self.block_number == 11:
+            return [
+                {"text": "+", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": "-", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+                {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": "+", "pos": (mid_x(slot_rects[3], slot_rects[4]), mid_y)},
+                {"text": "= 24", "pos": (slot_rects[-1].right + 90, mid_y)},
+            ]
+
+        return [
+            {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
+            {"text": "(", "pos": (slot_rects[0].left - 55, mid_y)},
+            {"text": "÷", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+            {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+            {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
+            {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
+            {"text": "×", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+            {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+        ]
 
     def _evaluate_puzzle(self) -> None:
         values = [slot["value"] for slot in self.slots]
         if None in values:
             return
-        n1, n2, n3, n4 = [int(v) for v in values]  # type: ignore
-        try:
-            result = ((n1 / n2) * n3) * n4
-        except ZeroDivisionError:
-            result = None
-        self.puzzle_result = self.RESULT_WIN if result == 24 else self.RESULT_LOSE
+        int_values = [int(v) for v in values]  # type: ignore
+        success = self.solution_checker(int_values)
+        self.puzzle_result = self.RESULT_WIN if success else self.RESULT_LOSE
         self.state = self.STATE_RESULT
         self._result_reported = False
         self._stop_countdown()
+    def _configure_puzzle_settings(self) -> None:
+        if self.block_number == 11:
+            self.slot_count = 5
+            self.slot_spacing = 135
+            self.number_choices = list(range(0, 11))
+            self.allow_tile_reuse = True
+            self.tile_spacing = 110
+            self.solution_checker = self._check_solution_block11
+            return
+
+        self.slot_count = 4
+        self.slot_spacing = 160
+        self.number_choices = [2, 3, 4, 9]
+        self.allow_tile_reuse = False
+        self.tile_spacing = 150
+        self.solution_checker = self._check_solution_default
+
+    def _check_solution_default(self, values: List[int]) -> bool:
+        if len(values) != 4:
+            return False
+        n1, n2, n3, n4 = values
+        try:
+            return ((n1 / n2) * n3) * n4 == 24
+        except ZeroDivisionError:
+            return False
+
+    def _check_solution_block11(self, values: List[int]) -> bool:
+        if len(values) != 5:
+            return False
+        n1, n2, n3, n4, n5 = values
+        return n1 + n2 - n3 + n4 + n5 == 24
 
     def _finalize_result(self) -> Optional[Dict[str, Any]]:
         if self.state != self.STATE_RESULT or self._result_reported:
