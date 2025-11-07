@@ -31,12 +31,9 @@ except Exception:
 
 def main():
     pygame.init()
-    # Open fullscreen using the current display resolution so the test
-    # matches the game's usual fullscreen environment.
-    pygame.display.set_caption("Guardian of Ayutthaya - Guess Test (Fullscreen)")
-    # Query current display size, then set fullscreen mode
-    info = pygame.display.Info()
-    screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
+    # Use fixed 1280x832 resolution (matching the game's design)
+    pygame.display.set_caption("Guardian of Ayutthaya - Guess Test")
+    screen = pygame.display.set_mode((1280, 832))
     clock = pygame.time.Clock()
 
     # Choose the block to test (9 matches quiz assets)

@@ -68,6 +68,7 @@ RockPaperScissors = _load_event_class(
     'RockPaperScissors'
 )
 GuessGame = _load_event_class('events.guess.guess', 'guess/guess.py', 'GuessGame')
+RandomCard = _load_event_class('events.random.random_event', 'random/random_event.py', 'RandomCard')
 
 
 class BoardBlock:
@@ -142,6 +143,7 @@ class BoardBlock:
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
         self.rps_blocks = [6, 17, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
+        self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 43, 45, 48, 52, 56]
         
         # Show scenes for the starting block
         self.show_block_scenes()
@@ -471,6 +473,16 @@ class BoardBlock:
         if self.is_transitioning or self.viewing_scenes or self.pending_scenes:
             return
         
+        # Random Card has priority - check first
+        if self.current_block in self.random_blocks:
+            if RandomCard is None:
+                print(f"Warning: RandomCard unavailable for block {self.current_block}")
+                return
+            print(f"Starting Random Card event at block {self.current_block}")
+            self.current_game = RandomCard(self.screen, self.current_block)
+            self.playing_game = True
+            return
+        
         if self.current_block in self.math_blocks:
             if MathEvent is None:
                 print(f"Warning: MathEvent unavailable for block {self.current_block}")
@@ -516,6 +528,11 @@ class BoardBlock:
                 # After scenes finish automatically, check if we should start a game event
                 # Note: If finished by user input, this is handled in handle_event()
                 self.check_and_start_game_event()
+        
+        # Update game if playing
+        if self.playing_game and self.current_game:
+            if hasattr(self.current_game, 'update'):
+                self.current_game.update()
     
     def get_block_info(self, block_number=None):
         """
@@ -653,6 +670,25 @@ class BoardBlock:
             if result is not None:
                 # Game finished, return to board
                 print(f"Game finished with result: {result}")
+                
+                # Handle Random Card effects
+                if "effect" in result:
+                    effect = result["effect"]
+                    effect_type = effect.get("type")
+                    
+                    if effect_type == "warp":
+                        warp_to = effect.get("value")
+                        if warp_to and 1 <= warp_to <= 60:
+                            print(f"Random Card: Warping to block {warp_to}")
+                            self.current_block = warp_to
+                            self.update_character_position()
+                            # Show scenes for the new warped-to block
+                            self.show_block_scenes()
+                    elif effect_type == "good":
+                        print("Random Card: Good card - no movement effect")
+                    elif effect_type == "bad":
+                        print("Random Card: Bad card - no movement effect")
+                
                 self.playing_game = False
                 self.current_game = None
             return None

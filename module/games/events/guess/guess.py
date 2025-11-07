@@ -59,8 +59,8 @@ class GuessGame:
 
     def __init__(self, screen, block_number=0):
         self.screen = screen
-        self.screen_width = screen.get_width()
-        self.screen_height = screen.get_height()
+        self.screen_width = 1280
+        self.screen_height = 832
         self.block_number = block_number
 
         # Colors
@@ -75,7 +75,18 @@ class GuessGame:
         # Fonts
         self.title_font = BUTTON_FONT_LARGE
         self.subtitle_font = SUBTITLE_FONT
-        self.current_question_font = SUBTITLE_FONT
+        # Create a custom question font (between TEXT_FONT 24px and SUBTITLE_FONT 48px)
+        try:
+            # Try to create a 36px version of the same font used for TEXT_FONT
+            font_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'assets', 'fonts', 'InknutAntiqua-Regular.ttf')
+            if os.path.exists(font_path):
+                self.current_question_font = pygame.font.Font(font_path, 30)
+            else:
+                # Fallback to system font
+                self.current_question_font = pygame.font.SysFont('Baskerville', 30, bold=False)
+        except Exception:
+            # Final fallback: use TEXT_FONT_BOLD as compromise
+            self.current_question_font = TEXT_FONT_BOLD
         self.text_font = TEXT_FONT
         self.small_font = TEXT_FONT
         self.button_font = BUTTON_FONT
@@ -89,14 +100,19 @@ class GuessGame:
         self.result = None  # 'win' or 'lose'
         self.final_result = None
 
-        # UI
-        self.input_rect = pygame.Rect(0, 0, min(700, self.screen_width - 200), 60)
-        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 80)
+        # UI - Optimized for 1280x832
+        self.input_rect = pygame.Rect(0, 0, 600, 60)
+        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 140)
 
         self.submit_rect = pygame.Rect(0, 0, 220, 60)
-        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 60)
+        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 50)
 
         self.hovered = None
+
+        # Cursor blinking for text input
+        self.cursor_visible = True
+        self.cursor_timer = 0
+        self.cursor_blink_interval = 500  # milliseconds
 
         # Load quiz
         self.load_quiz()
@@ -179,49 +195,34 @@ class GuessGame:
                 self.result_images[res] = None
 
     def draw_intro(self):
-        # Background (intro uses the same background image if available)
+        # Background
         if getattr(self, 'background', None):
             self.screen.blit(self.background, (0, 0))
         else:
             self.screen.fill(self.BG_COLOR)
 
-        # Layout constants
-        max_width = min(800, self.screen_width - 400)
-        padding = 18
-        container_left = (self.screen_width - max_width) // 2 - padding
-        container_top = 180
-        container_w = max_width + padding * 2
+        # Create white opacity mask
+        white_mask = pygame.Surface((self.screen_width, self.screen_height))
+        white_mask.fill((255, 255, 255))
+        white_mask.set_alpha(204)  # 80% opacity
+        self.screen.blit(white_mask, (0, 0))
 
-        # Title
+        # Title at top center
         title = self.title_font.render("Guess the Answer", True, self.BLACK)
-        title_rect = title.get_rect()
-        title_rect.topleft = (container_left + padding, container_top + padding)
-
-        # Subtitle/instruction
-        subtitle = self.small_font.render("Type the answer and press ENTER or click Submit", True, self.BLACK)
-        subtitle_rect = subtitle.get_rect()
-        subtitle_rect.topleft = (container_left + padding, title_rect.bottom + 10)
-
-        # Question preview (wrapped, but with larger font)
-        q_rect = pygame.Rect(container_left + padding, subtitle_rect.bottom + 10, max_width, 120)
-
-        # Container panel height
-        container_bottom = q_rect.top + q_rect.height + padding
-        container_h = container_bottom - container_top
-
-        # Semi-transparent panel (using SRCALPHA surface) so background shows
-        panel_surf = pygame.Surface((container_w, container_h), pygame.SRCALPHA)
-        # Optionally fill with a semi-transparent color for effect
-        self.screen.blit(panel_surf, (container_left, container_top))
-
-        # Now blit the texts inside the panel, all left-aligned
+        title_rect = title.get_rect(center=(self.screen_width // 2, 120))
         self.screen.blit(title, title_rect)
-        self.screen.blit(subtitle, subtitle_rect)
-        # Use larger font for current_question
-        self.draw_wrapped_text(self.current_question, self.subtitle_font, self.BLACK, q_rect)
 
-        # Instruction to continue (centered at bottom)
-        instr = self.small_font.render("Press SPACE or CLICK to start", True, self.BLACK)
+        # Subtitle/instruction below title
+        subtitle = self.text_font.render("Type the answer and press ENTER or click Submit", True, self.BLACK)
+        subtitle_rect = subtitle.get_rect(center=(self.screen_width // 2, 200))
+        self.screen.blit(subtitle, subtitle_rect)
+
+        # Question preview (wrapped, centered area)
+        q_rect = pygame.Rect(200, 280, self.screen_width - 400, 200)
+        self.draw_wrapped_text(self.current_question, self.current_question_font, self.BLACK, q_rect)
+
+        # Instruction to continue (at bottom like random_event)
+        instr = self.text_font.render("Press SPACE or CLICK to start", True, self.BLACK)
         instr_rect = instr.get_rect(center=(self.screen_width // 2, self.screen_height - 80))
         self.screen.blit(instr, instr_rect)
 
@@ -232,30 +233,61 @@ class GuessGame:
         else:
             self.screen.fill(self.BG_COLOR)
 
-        # Question text (wrap if needed, use larger font)
-        self.draw_wrapped_text(self.current_question, self.title_font, self.BLACK,
-                               pygame.Rect(100, 140, self.screen_width - 200, 200))
+        # Create white opacity mask
+        white_mask = pygame.Surface((self.screen_width, self.screen_height))
+        white_mask.fill((255, 255, 255))
+        white_mask.set_alpha(204)  # 80% opacity
+        self.screen.blit(white_mask, (0, 0))
 
-        # Input box
-        pygame.draw.rect(self.screen, self.INPUT_BG, self.input_rect)
-        pygame.draw.rect(self.screen, self.INPUT_BORDER, self.input_rect, 2)
+        # Title at top
+        title = self.title_font.render("Guess the Answer", True, self.BLACK)
+        title_rect = title.get_rect(center=(self.screen_width // 2, 120))
+        self.screen.blit(title, title_rect)
 
-        # Render user input
-        input_surf = self.text_font.render(self.user_input, True, self.BLACK)
-        input_rect = input_surf.get_rect(midleft=(self.input_rect.left + 10, self.input_rect.centery))
-        self.screen.blit(input_surf, input_rect)
+        # Question text (wrap if needed, centered) - same position as intro
+        question_rect = pygame.Rect(200, 280, self.screen_width - 400, 200)
+        self.draw_wrapped_text(self.current_question, self.current_question_font, self.BLACK, question_rect)
 
-        # Submit button
+        # Input box - Draw with clear white background
+        pygame.draw.rect(self.screen, self.INPUT_BG, self.input_rect, border_radius=8)
+        pygame.draw.rect(self.screen, self.INPUT_BORDER, self.input_rect, 3, border_radius=8)
+
+        # Render user input with padding
+        if self.user_input:
+            input_surf = self.text_font.render(self.user_input, True, self.BLACK)
+            input_rect = input_surf.get_rect(midleft=(self.input_rect.left + 20, self.input_rect.centery))
+            self.screen.blit(input_surf, input_rect)
+            
+            # Draw blinking cursor after text
+            if self.cursor_visible:
+                cursor_x = input_rect.right + 2
+                cursor_y_top = self.input_rect.centery - 15
+                cursor_y_bottom = self.input_rect.centery + 15
+                pygame.draw.line(self.screen, self.BLACK, (cursor_x, cursor_y_top), (cursor_x, cursor_y_bottom), 2)
+        else:
+            # Show placeholder text when empty
+            placeholder = self.text_font.render("Type your answer here...", True, (150, 150, 150))
+            placeholder_rect = placeholder.get_rect(midleft=(self.input_rect.left + 20, self.input_rect.centery))
+            self.screen.blit(placeholder, placeholder_rect)
+            
+            # Draw blinking cursor at start position when empty
+            if self.cursor_visible:
+                cursor_x = self.input_rect.left + 20
+                cursor_y_top = self.input_rect.centery - 15
+                cursor_y_bottom = self.input_rect.centery + 15
+                pygame.draw.line(self.screen, (150, 150, 150), (cursor_x, cursor_y_top), (cursor_x, cursor_y_bottom), 2)
+
+        # Submit button with better styling (like random_event)
         btn_color = self.BUTTON_HOVER if self.hovered == 'submit' else self.BUTTON_COLOR
-        pygame.draw.rect(self.screen, btn_color, self.submit_rect)
-        pygame.draw.rect(self.screen, self.INPUT_BORDER, self.submit_rect, 2)
+        pygame.draw.rect(self.screen, btn_color, self.submit_rect, border_radius=10)
+        pygame.draw.rect(self.screen, self.INPUT_BORDER, self.submit_rect, 3, border_radius=10)
         btn_text = self.button_font.render("Submit", True, self.WHITE)
         btn_text_rect = btn_text.get_rect(center=self.submit_rect.center)
         self.screen.blit(btn_text, btn_text_rect)
 
-        # Hint
-        hint = self.small_font.render("Answers are not case-sensitive", True, self.BLACK)
-        hint_rect = hint.get_rect(center=(self.screen_width // 2, self.submit_rect.bottom + 30))
+        # Hint - positioned at bottom (like random_event instruction)
+        hint = self.text_font.render("Answers are not case-sensitive", True, self.BLACK)
+        hint_rect = hint.get_rect(center=(self.screen_width // 2, self.screen_height - 80))
         self.screen.blit(hint, hint_rect)
 
     def draw_result(self):
@@ -272,22 +304,38 @@ class GuessGame:
             else:
                 self.screen.fill(self.BG_COLOR)
 
-            # Result text
+            # Create white opacity mask
+            white_mask = pygame.Surface((self.screen_width, self.screen_height))
+            white_mask.fill((255, 255, 255))
+            white_mask.set_alpha(204)  # 80% opacity
+            self.screen.blit(white_mask, (0, 0))
+
+            # Result title (like random_event "Your Card")
             if self.result == 'win':
-                text = "Correct!"
+                result_title = "Correct!"
+                result_color = (34, 139, 34)  # Green
             else:
-                text = f"Incorrect! Correct answer: {self.current_answer}"
+                result_title = "Incorrect!"
+                result_color = (220, 20, 60)  # Red
 
-            res_surf = self.title_font.render(text, True, self.BLACK)
-            res_rect = res_surf.get_rect(center=(self.screen_width // 2, self.screen_height // 2))
-            self.screen.blit(res_surf, res_rect)
+            title_surf = self.title_font.render(result_title, True, result_color)
+            title_rect = title_surf.get_rect(center=(self.screen_width // 2, 200))
+            self.screen.blit(title_surf, title_rect)
 
-        instr = self.small_font.render("Press SPACE or CLICK to continue", True, self.BLACK)
+            # Show correct answer if wrong
+            if self.result == 'lose':
+                answer_text = f"The correct answer is: {self.current_answer}"
+                answer_surf = self.subtitle_font.render(answer_text, True, self.BLACK)
+                answer_rect = answer_surf.get_rect(center=(self.screen_width // 2, 350))
+                self.screen.blit(answer_surf, answer_rect)
+
+        # Instruction at bottom (like random_event)
+        instr = self.text_font.render("Press SPACE or CLICK to continue", True, self.BLACK)
         instr_rect = instr.get_rect(center=(self.screen_width // 2, self.screen_height - 80))
         self.screen.blit(instr, instr_rect)
 
-    def draw_wrapped_text(self, text, font, color, rect, line_spacing=4):
-        """Draw multiline wrapped text into rect area."""
+    def draw_wrapped_text(self, text, font, color, rect, line_spacing=8):
+        """Draw multiline wrapped text into rect area (centered)."""
         words = text.split(' ')
         lines = []
         cur = ''
@@ -296,18 +344,31 @@ class GuessGame:
             if font.size(test)[0] <= rect.width:
                 cur = test
             else:
-                lines.append(cur)
+                if cur:
+                    lines.append(cur)
                 cur = w
         if cur:
             lines.append(cur)
 
-        y = rect.top
+        # Center vertically
+        total_height = sum(font.size(line)[1] + line_spacing for line in lines) - line_spacing
+        y = rect.top + (rect.height - total_height) // 2
+        
         for line in lines:
             surf = font.render(line, True, color)
-            self.screen.blit(surf, (rect.left, y))
+            # Center horizontally
+            x = rect.left + (rect.width - surf.get_width()) // 2
+            self.screen.blit(surf, (x, y))
             y += surf.get_height() + line_spacing
 
     def draw(self):
+        # Update cursor blink
+        if self.state == self.STATE_PLAYING:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.cursor_timer >= self.cursor_blink_interval:
+                self.cursor_visible = not self.cursor_visible
+                self.cursor_timer = current_time
+        
         if self.state == self.STATE_INTRO:
             self.draw_intro()
         elif self.state == self.STATE_PLAYING:
@@ -327,6 +388,9 @@ class GuessGame:
             if event.key == pygame.K_SPACE:
                 if self.state == self.STATE_INTRO:
                     self.state = self.STATE_PLAYING
+                    # Reset cursor when entering playing state
+                    self.cursor_visible = True
+                    self.cursor_timer = pygame.time.get_ticks()
                     return None
                 elif self.state == self.STATE_RESULT:
                     # finalize and return
@@ -340,16 +404,25 @@ class GuessGame:
                     return None
                 elif event.key == pygame.K_BACKSPACE:
                     self.user_input = self.user_input[:-1]
+                    # Reset cursor visibility when typing
+                    self.cursor_visible = True
+                    self.cursor_timer = pygame.time.get_ticks()
                 else:
                     # Add character if printable
                     char = event.unicode
                     if char and len(char) == 1:
                         self.user_input += char
+                        # Reset cursor visibility when typing
+                        self.cursor_visible = True
+                        self.cursor_timer = pygame.time.get_ticks()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 if self.state == self.STATE_INTRO:
                     self.state = self.STATE_PLAYING
+                    # Reset cursor when entering playing state
+                    self.cursor_visible = True
+                    self.cursor_timer = pygame.time.get_ticks()
                     return None
                 elif self.state == self.STATE_PLAYING:
                     if self.submit_rect.collidepoint(event.pos):
@@ -391,9 +464,15 @@ class GuessGame:
         return {"result": self.result}
 
     def update_screen_size(self, screen):
+        """Update screen size and recalculate UI positions."""
         self.screen = screen
-        self.screen_width = screen.get_width()
-        self.screen_height = screen.get_height()
-        self.input_rect = pygame.Rect(0, 0, min(700, self.screen_width - 200), 60)
-        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 80)
-        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 60)
+        self.screen_width = 1280
+        self.screen_height = 832
+        
+        # Recalculate input rect position
+        self.input_rect = pygame.Rect(0, 0, 600, 60)
+        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 140)
+        
+        # Recalculate submit button position
+        self.submit_rect = pygame.Rect(0, 0, 220, 60)
+        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 50)
