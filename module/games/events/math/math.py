@@ -74,8 +74,7 @@ except Exception:
 class MathEvent:
     """Math puzzle event for the Ayutthaya project (buttons 3 and 11 implementation)."""
 
-    STATE_INTRO_ONE = "intro_one"
-    STATE_INTRO_TWO = "intro_two"
+    STATE_INTRO = "intro"
     STATE_PUZZLE = "puzzle"
     STATE_RESULT = "result"
 
@@ -108,16 +107,13 @@ class MathEvent:
         self.BROWN_DIM = (176, 160, 134)
 
         # State management
-        self.state = self.STATE_INTRO_ONE
+        self.state = self.STATE_INTRO
         self.puzzle_result: Optional[str] = None
         self._result_reported = False
 
         # Assets
-        self.intro_one_bg = self._load_and_scale(
-            f"assets/scene/event/math/intro1/{self.block_number}.png"
-        )
-        self.intro_two_bg = self._load_and_scale(
-            f"assets/scene/event/math/intro2/{self.block_number}.png"
+        self.intro_bg = self._load_and_scale(
+            f"assets/scene/event/math/intro/{self.block_number}.png"
         )
         # Puzzle background can vary per block; fall back to button 3 asset if missing
         self.puzzle_bg = self._load_puzzle_background()
@@ -376,10 +372,8 @@ class MathEvent:
     # Core loop
     # ------------------------------------------------------------------
     def draw(self) -> None:
-        if self.state == self.STATE_INTRO_ONE:
-            self.draw_intro_screen(self.intro_one_bg)
-        elif self.state == self.STATE_INTRO_TWO:
-            self.draw_intro_screen(self.intro_two_bg)
+        if self.state == self.STATE_INTRO:
+            self.draw_intro_screen(self.intro_bg)
         elif self.state == self.STATE_PUZZLE:
             self._update_countdown()
             self.draw_puzzle()
@@ -389,17 +383,13 @@ class MathEvent:
     def handle_event(self, event: pygame.event.Event) -> Optional[Dict[str, Any]]:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                if self.state == self.STATE_INTRO_ONE:
-                    self.state = self.STATE_INTRO_TWO
-                elif self.state == self.STATE_INTRO_TWO:
+                if self.state == self.STATE_INTRO:
                     self._enter_puzzle()
                 elif self.state == self.STATE_RESULT:
                     return self._finalize_result()
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.state == self.STATE_INTRO_ONE:
-                self.state = self.STATE_INTRO_TWO
-            elif self.state == self.STATE_INTRO_TWO:
+            if self.state == self.STATE_INTRO:
                 self._enter_puzzle()
             elif self.state == self.STATE_PUZZLE:
                 self._handle_puzzle_click(event.pos)
@@ -551,7 +541,7 @@ class MathEvent:
     # Utility
     # ------------------------------------------------------------------
     def reset(self) -> None:
-        self.state = self.STATE_INTRO_ONE
+        self.state = self.STATE_INTRO
         self.puzzle_result = None
         self._result_reported = False
         for slot in self.slots:
