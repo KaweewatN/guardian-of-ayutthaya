@@ -493,9 +493,9 @@ class MathEvent:
         if self.block_number == 20:
             self.slot_count = 4
             self.slot_spacing = 160
-            self.number_choices = list(range(0, 11))
+            self.number_choices = [1, 5, 5, 6]
             self.allow_tile_reuse = False
-            self.tile_spacing = 110
+            self.tile_spacing = 150
             self.solution_checker = self._check_solution_block20
             return
 
