@@ -116,18 +116,27 @@ class BoardBlock:
         # Load board images
         self.board_images = {}
         self.load_board_images()
-        
+
         # Block visual settings (must be set before generate_blocks_info)
         self.block_size = self.calculate_block_size()
-        
+
         # Calculate block positions and metadata
         self.blocks_info = self.generate_blocks_info()
-        
+
+        # Determine how many boards exist and set viewing state
+        self.total_boards = max((info['board'] for info in self.blocks_info.values()), default=1)
+        self.viewed_board = self.blocks_info.get(self.current_block, {}).get('board', 1)
+        self.board_transition = None
+        self.board_transition_duration = 420  # milliseconds for sliding transitions
+        self._current_board_offsets = {}
+        self._last_drawn_character_pos = None
+
         # Character position (will be set based on current_block)
         self.character_pos = None
         self.character_image = None
         self.load_character_image()
         self.update_character_position()
+        self.character_board = self.blocks_info.get(self.current_block, {}).get('board', 1)
         
         # Scene viewer for block scenes
         self.scene_viewer = None
@@ -301,11 +310,21 @@ class BoardBlock:
             block_info = self.blocks_info[self.current_block]
             board_x, board_y = self.get_board_top_left()
 
+            previous_board = getattr(self, 'character_board', None)
+            new_board = block_info['board']
+
             # Character position = board position + block offset
             self.character_pos = (
                 board_x + block_info['x'],
                 board_y + block_info['y']
             )
+
+            self.character_board = new_board
+
+            # Automatically slide the view when the character changes boards
+            if previous_board is not None and new_board != previous_board:
+                direction = 'forward' if new_board > previous_board else 'backward'
+                self._begin_board_transition(new_board, direction=direction, auto=True)
 
     def get_block_world_position(self, block_number):
         """Return the on-screen position for a block centre."""
@@ -395,6 +414,38 @@ class BoardBlock:
         if label_text:
             color = (54, 104, 214) if to_block > from_block else (176, 41, 53)
             self._spawn_floating_text(label_text, color)
+
+    def _begin_board_transition(self, target_board, direction=None, auto=False):
+        """Start sliding the board view towards the requested board."""
+        if target_board is None:
+            return False
+
+        # Clamp to available boards
+        if target_board < 1 or target_board > self.total_boards:
+            return False
+
+        # Avoid starting multiple transitions simultaneously
+        if self.board_transition:
+            if self.board_transition.get('target_board') == target_board:
+                return False
+            return False
+
+        start_board = self.viewed_board
+        if target_board == start_board:
+            return False
+
+        if direction is None:
+            direction = 'forward' if target_board > start_board else 'backward'
+
+        self.board_transition = {
+            'start_board': start_board,
+            'target_board': target_board,
+            'start_time': pygame.time.get_ticks(),
+            'duration': self.board_transition_duration,
+            'direction': direction,
+            'auto': auto
+        }
+        return True
 
     def trigger_wrap_effect(self):
         """Trigger a short flash effect for instant warps."""
@@ -690,6 +741,13 @@ class BoardBlock:
                 animation['end_pos'] = self.get_block_world_position(next_block)
                 animation['start_time'] = now
                 animation['target_block'] = next_block
+
+                # If we're about to move onto a different board, start sliding the view
+                current_board = self.blocks_info.get(self.current_block, {}).get('board')
+                next_board = self.blocks_info.get(next_block, {}).get('board')
+                if next_board and current_board and next_board != current_board:
+                    direction = 'forward' if next_board > current_board else 'backward'
+                    self._begin_board_transition(next_board, direction=direction, auto=True)
             else:
                 final_block = self.current_block
                 show_scenes = animation.get('show_scenes', True)
@@ -739,7 +797,8 @@ class BoardBlock:
                 board_y - 40
             ),
             'offset_y': 0,
-            'alpha': 255
+            'alpha': 255,
+            'board': self.character_board
         }
 
     def _update_floating_text(self):
@@ -760,7 +819,7 @@ class BoardBlock:
 
     def _draw_wrap_effect(self):
         """Render the flash effect used for instant warps."""
-        if not self.wrap_effect or not self.character_pos:
+        if not self.wrap_effect or not self._last_drawn_character_pos:
             return
 
         now = pygame.time.get_ticks()
@@ -782,9 +841,10 @@ class BoardBlock:
         pygame.draw.circle(overlay, (255, 255, 255, alpha), center, radius)
         pygame.draw.circle(overlay, (255, 215, 0, max(0, alpha - 40)), center, max(1, radius // 2), 4)
 
+        center_x, center_y = self._last_drawn_character_pos
         self.screen.blit(
             overlay,
-            (self.character_pos[0] - radius, self.character_pos[1] - radius)
+            (center_x - radius, center_y - radius)
         )
 
     def _draw_floating_text(self):
@@ -802,8 +862,17 @@ class BoardBlock:
 
         base_x, base_y = self.floating_text.get('base_pos', (0, 0))
         offset_y = self.floating_text.get('offset_y', 0)
+        board = self.floating_text.get('board')
+        offset_x = 0
+        if board is not None:
+            offset_x = self._current_board_offsets.get(board)
+            if offset_x is None:
+                return
+        else:
+            offset_x = self._current_board_offsets.get(self.get_viewed_board(), 0)
+
         pos = (
-            int(base_x - text_surface.get_width() / 2),
+            int(base_x + offset_x - text_surface.get_width() / 2),
             int(base_y + offset_y)
         )
         self.screen.blit(text_surface, pos)
@@ -833,50 +902,76 @@ class BoardBlock:
         if self.viewing_scenes and self.scene_viewer:
             self.scene_viewer.draw()
             return
-        
-        # Get current board
-        current_board = self.get_current_board()
-        board_img = self.board_images.get(current_board)
-        
-        # Get board position
+
         board_x, board_y = self.get_board_top_left()
-        
-        # Draw board background
-        if board_img:
-            self.screen.blit(board_img, (board_x, board_y))
-        else:
-            # Fallback: draw a rectangle if image not loaded
-            pygame.draw.rect(
-                self.screen, 
-                (200, 180, 150), 
-                (board_x, board_y, self.BOARD_WIDTH, self.BOARD_HEIGHT)
-            )
-        
-        # Draw character (elephant image or fallback to red circle)
-        if self.character_pos:
-            if self.character_image:
-                # Draw elephant image centered on position
-                char_rect = self.character_image.get_rect(center=self.character_pos)
-                self.screen.blit(self.character_image, char_rect)
+        self._current_board_offsets = {}
+        self._last_drawn_character_pos = None
+
+        def draw_board_surface(board_number, offset_x):
+            if board_number is None:
+                return
+
+            self._current_board_offsets[board_number] = offset_x
+            dest_x = board_x + offset_x
+            board_img_local = self.board_images.get(board_number)
+
+            if board_img_local:
+                self.screen.blit(board_img_local, (dest_x, board_y))
             else:
-                # Fallback: draw a red circle if image not loaded
-                pygame.draw.circle(
+                pygame.draw.rect(
                     self.screen,
-                    (255, 0, 0),  # Red color
-                    self.character_pos,
-                    15  # Radius
-                )
-                # Draw a white outline
-                pygame.draw.circle(
-                    self.screen,
-                    (255, 255, 255),
-                    self.character_pos,
-                    15,
-                    3  # Outline width
+                    (200, 180, 150),
+                    (dest_x, board_y, self.BOARD_WIDTH, self.BOARD_HEIGHT)
                 )
 
-        # Overlay wrap effect and floating text after drawing the character
-        if self.character_pos:
+            if self.character_pos and self.character_board == board_number:
+                draw_center = (self.character_pos[0] + offset_x, self.character_pos[1])
+                if self.character_image:
+                    char_rect = self.character_image.get_rect(center=draw_center)
+                    self.screen.blit(self.character_image, char_rect)
+                else:
+                    pygame.draw.circle(
+                        self.screen,
+                        (255, 0, 0),
+                        draw_center,
+                        15
+                    )
+                    pygame.draw.circle(
+                        self.screen,
+                        (255, 255, 255),
+                        draw_center,
+                        15,
+                        3
+                    )
+                self._last_drawn_character_pos = draw_center
+
+        if self.board_transition:
+            transition = self.board_transition
+            duration = max(1, transition.get('duration', self.board_transition_duration))
+            elapsed = pygame.time.get_ticks() - transition.get('start_time', 0)
+            progress = max(0.0, min(1.0, elapsed / duration))
+            eased = self._ease_in_out(progress)
+            distance = self.BOARD_WIDTH
+            travel = int(distance * eased)
+            remaining = distance - travel
+
+            if transition.get('direction') == 'forward':
+                start_offset = -travel
+                target_offset = remaining
+            else:
+                start_offset = travel
+                target_offset = -remaining
+
+            draw_board_surface(transition.get('start_board'), start_offset)
+            draw_board_surface(transition.get('target_board'), target_offset)
+
+            if progress >= 1.0:
+                self.viewed_board = transition.get('target_board', self.viewed_board)
+                self.board_transition = None
+        else:
+            draw_board_surface(self.viewed_board, 0)
+
+        if self._last_drawn_character_pos:
             self._draw_wrap_effect()
 
         self._draw_floating_text()
@@ -888,17 +983,18 @@ class BoardBlock:
         """Draw current block number above the board-block."""
         # Use centralized font system
         font = TEXT_FONT_BOLD
-        
-        # Get board position to place info above it
+
+        # Determine which board the label should attach to (target during transitions)
+        reference_board = self.board_transition['target_board'] if self.board_transition else self.viewed_board
         board_x, board_y = self.get_board_top_left()
-        
-        # Only show block number
-        info_text = f"Block: {self.current_block}"
+        offset_x = self._current_board_offsets.get(reference_board, 0)
+
+        info_text = f"Viewing Board {self.get_viewed_board()} of {self.total_boards}"
+        info_text += f"  •  Character Block: {self.current_block}"
         text_surf = font.render(info_text, True, (0, 0, 0))
-        
-        # Position above the board (20px above board top)
+
         text_rect = text_surf.get_rect()
-        text_rect.left = board_x + 10
+        text_rect.left = board_x + offset_x + 10
         text_rect.bottom = board_y - 10
 
         self.screen.blit(text_surf, text_rect)
@@ -907,7 +1003,7 @@ class BoardBlock:
         """Draw grid lines for debugging/visualization (optional)."""
         board_x, board_y = self.get_board_top_left()
         block_width, block_height = self.block_size
-        
+
         # Draw vertical lines
         for col in range(self.COLS + 1):
             x = board_x + col * block_width
@@ -918,7 +1014,7 @@ class BoardBlock:
                 (x, board_y + self.BOARD_HEIGHT),
                 1
             )
-        
+
         # Draw horizontal lines
         for row in range(self.ROWS + 1):
             y = board_y + row * block_height
@@ -929,6 +1025,38 @@ class BoardBlock:
                 (board_x + self.BOARD_WIDTH, y),
                 1
             )
+
+    def get_viewed_board(self):
+        """Return the board currently targeted by the camera."""
+        if self.board_transition:
+            return self.board_transition.get('target_board', self.viewed_board)
+        return self.viewed_board
+
+    def get_character_board(self):
+        """Return the board on which the character currently stands."""
+        return self.character_board
+
+    def total_board_count(self):
+        return self.total_boards
+
+    def can_view_previous_board(self):
+        return not self.board_transition and self.viewed_board > 1
+
+    def can_view_next_board(self):
+        return not self.board_transition and self.viewed_board < self.total_boards
+
+    def view_previous_board(self):
+        if not self.can_view_previous_board():
+            return False
+        return self._begin_board_transition(self.viewed_board - 1, direction='backward', auto=False)
+
+    def view_next_board(self):
+        if not self.can_view_next_board():
+            return False
+        return self._begin_board_transition(self.viewed_board + 1, direction='forward', auto=False)
+
+    def is_view_transition_active(self):
+        return self.board_transition is not None
     
     def handle_event(self, event):
         """
