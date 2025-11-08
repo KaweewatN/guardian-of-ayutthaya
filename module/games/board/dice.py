@@ -161,36 +161,46 @@ class Dice:
                 # Start moving the character
                 self.start_movement()
         
-        # Update character movement
-        if self.is_moving and self.steps_remaining > 0:
-            if current_time - self.last_move_time >= self.move_delay:
-                # Determine if this is the final step
-                is_final_step = (self.steps_remaining == 1)
-                
-                # Move one step (show scenes only on the final step)
-                success = self.board_block.move_forward(show_scenes=is_final_step)
-                if success:
-                    self.steps_remaining -= 1
-                    self.last_move_time = current_time
-                    print(f"Moved to block {self.board_block.current_block}, steps remaining: {self.steps_remaining}")
-                    
-                    # Check if movement is complete
-                    if self.steps_remaining == 0:
-                        self.is_moving = False
-                        print(f"Movement complete! Now at block {self.board_block.current_block}")
-                else:
-                    # Can't move further (reached end of board)
-                    self.is_moving = False
-                    self.steps_remaining = 0
-                    print(f"Reached end of board at block {self.board_block.current_block}")
+        # Monitor movement animation handled by the board
+        if self.is_moving:
+            animating = False
+            if hasattr(self.board_block, 'is_animating_movement'):
+                animating = self.board_block.is_animating_movement()
+
+            if not animating:
+                self.is_moving = False
+                self.steps_remaining = 0
+                print(f"Movement complete! Now at block {self.board_block.current_block}")
     
     def start_movement(self):
         """Start moving the character based on dice result."""
         if self.roll_result and self.roll_result > 0:
-            self.is_moving = True
-            self.steps_remaining = self.roll_result
-            self.last_move_time = pygame.time.get_ticks()
-            print(f"Starting movement: {self.steps_remaining} steps")
+            path = []
+            if hasattr(self.board_block, 'build_path_for_steps'):
+                path = self.board_block.build_path_for_steps(self.roll_result)
+
+            if path and hasattr(self.board_block, 'start_path_movement'):
+                started = self.board_block.start_path_movement(
+                    path,
+                    movement_type='dice',
+                    show_scenes=True,
+                    allow_jump=True
+                )
+                if started:
+                    self.is_moving = True
+                    self.steps_remaining = len(path)
+                    self.last_move_time = pygame.time.get_ticks()
+                    print(f"Starting movement animation: {len(path)} steps")
+                    return
+
+            # Fallback if animation could not be started
+            for step_index in range(self.roll_result):
+                last_step = (step_index == self.roll_result - 1)
+                moved = self.board_block.move_forward(show_scenes=last_step)
+                if not moved:
+                    break
+            self.is_moving = False
+            self.steps_remaining = 0
     
     def draw_dice_face(self, value):
         """
@@ -364,7 +374,13 @@ class Dice:
     
     def is_active(self):
         """Check if dice is currently rolling or character is moving."""
-        return self.is_rolling or self.is_moving
+        if self.is_rolling or self.is_moving:
+            return True
+
+        if hasattr(self.board_block, 'is_animating_movement'):
+            return self.board_block.is_animating_movement()
+
+        return False
 
 
 # Example usage / testing

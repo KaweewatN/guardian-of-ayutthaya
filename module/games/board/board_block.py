@@ -4,6 +4,7 @@ Creates a 6x5 grid (30 blocks on board 1, continuing to board 2)
 Manages block positions and character movement between blocks
 """
 import importlib.util
+import math
 import os
 import sys
 from typing import Optional
@@ -135,20 +136,26 @@ class BoardBlock:
         self.scene_delay_duration = 5000  # 5 second delay before showing scenes (in milliseconds)
         self.pending_scenes = False
         self.cached_scenes = None
-        
+
         # Game event system
         self.current_game = None
         self.playing_game = False
-        
+
         # Define game event blocks
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
         self.rps_blocks = [6, 17, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
         self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 43, 45, 48, 52, 56]
-        
+
+        # Movement animation state
+        self.active_animation = None
+        self.animation_duration = 260  # milliseconds per tile when animating
+        self.floating_text = None
+        self.wrap_effect = None
+
         # Show scenes for the starting block
         self.show_block_scenes()
-        
+
         # Mark as fully loaded after initialization
         self.is_fully_loaded = True
         
@@ -293,13 +300,114 @@ class BoardBlock:
         if self.current_block in self.blocks_info:
             block_info = self.blocks_info[self.current_block]
             board_x, board_y = self.get_board_top_left()
-            
+
             # Character position = board position + block offset
             self.character_pos = (
                 board_x + block_info['x'],
                 board_y + block_info['y']
             )
-    
+
+    def get_block_world_position(self, block_number):
+        """Return the on-screen position for a block centre."""
+        block_info = self.blocks_info.get(block_number)
+        if not block_info:
+            return None
+
+        board_x, board_y = self.get_board_top_left()
+        return (
+            board_x + block_info['x'],
+            board_y + block_info['y']
+        )
+
+    def build_path_for_steps(self, steps):
+        """Construct a sequential list of blocks for a given number of steps."""
+        path = []
+        current = self.current_block
+        for _ in range(max(0, steps)):
+            info = self.blocks_info.get(current)
+            if not info:
+                break
+            next_block = info.get('next')
+            if not next_block:
+                break
+            path.append(next_block)
+            current = next_block
+        return path
+
+    def start_path_movement(self, block_sequence, movement_type='dice', show_scenes=True, allow_jump=True):
+        """Animate movement across a list of block numbers."""
+        if not block_sequence:
+            return False
+
+        if not self.is_ready_for_input():
+            return False
+
+        # Ensure all blocks exist
+        positions = [self.get_block_world_position(block) for block in block_sequence]
+        if not all(positions):
+            return False
+
+        start_pos = self.get_block_world_position(self.current_block)
+        if start_pos is None:
+            return False
+
+        self.active_animation = {
+            'blocks': block_sequence,
+            'segment_index': 0,
+            'start_pos': start_pos,
+            'end_pos': positions[0],
+            'start_time': pygame.time.get_ticks(),
+            'duration': self.animation_duration,
+            'type': movement_type,
+            'show_scenes': show_scenes,
+            'allow_jump': allow_jump
+        }
+        self.active_animation['target_block'] = block_sequence[0]
+        self.floating_text = None
+        self.is_transitioning = True
+        return True
+
+    def start_jump_animation(self, from_block, to_block, label_text=None):
+        """Animate a jump (stairs/trunk) between two blocks."""
+        start_pos = self.get_block_world_position(from_block)
+        end_pos = self.get_block_world_position(to_block)
+        if not start_pos or not end_pos:
+            self.current_block = to_block
+            self.update_character_position()
+            self.show_block_scenes()
+            return
+
+        jump_type = 'jump_forward' if to_block > from_block else 'jump_backward'
+        self.active_animation = {
+            'blocks': [to_block],
+            'segment_index': 0,
+            'start_pos': start_pos,
+            'end_pos': end_pos,
+            'start_time': pygame.time.get_ticks(),
+            'duration': int(self.animation_duration * 1.1),
+            'type': jump_type,
+            'show_scenes': True,
+            'allow_jump': False
+        }
+        self.active_animation['target_block'] = to_block
+        self.is_transitioning = True
+
+        if label_text:
+            color = (54, 104, 214) if to_block > from_block else (176, 41, 53)
+            self._spawn_floating_text(label_text, color)
+
+    def trigger_wrap_effect(self):
+        """Trigger a short flash effect for instant warps."""
+        self.wrap_effect = {
+            'start_time': pygame.time.get_ticks(),
+            'duration': 500,
+            'max_radius': 70
+        }
+
+    def is_animating_movement(self):
+        """Return True while a movement animation is active."""
+        return self.active_animation is not None
+
     def move_forward(self, show_scenes=True):
         """
         Move character to the next block.
@@ -332,14 +440,14 @@ class BoardBlock:
                 if show_scenes:
                     jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
                     if jump_destination:
-                        # Move to the jump destination
-                        self.current_block = jump_destination
-                        self.update_character_position()
-                    
-                    # Show scenes for the new block (after jump if applicable)
+                        label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                        self.start_jump_animation(self.current_block, jump_destination, label)
+                        return True
+
+                    # Show scenes for the new block when there's no jump
                     self.show_block_scenes()
-                
-                # Unlock state after transition
+
+                # Unlock state after transition when no jump animation started
                 self.is_transitioning = False
                 return True
         
@@ -378,14 +486,14 @@ class BoardBlock:
                 if show_scenes:
                     jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
                     if jump_destination:
-                        # Move to the jump destination
-                        self.current_block = jump_destination
-                        self.update_character_position()
-                    
-                    # Show scenes for the new block (after jump if applicable)
+                        label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                        self.start_jump_animation(self.current_block, jump_destination, label)
+                        return True
+
+                    # Show scenes for the new block when there's no jump
                     self.show_block_scenes()
-                
-                # Unlock state after transition
+
+                # Unlock state after transition when no jump animation started
                 self.is_transitioning = False
                 return True
         
@@ -420,13 +528,13 @@ class BoardBlock:
             # Check for special block jumps (from_jump=False because this is normal movement)
             jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
             if jump_destination:
-                # Move to the jump destination
-                self.current_block = jump_destination
-                self.update_character_position()
-            
+                label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                self.start_jump_animation(self.current_block, jump_destination, label)
+                return True
+
             # Show scenes for the new block
             self.show_block_scenes()
-            
+
             # Unlock state after transition
             self.is_transitioning = False
             return True
@@ -512,6 +620,19 @@ class BoardBlock:
     
     def update(self):
         """Update board state. Call this every frame."""
+        if self.active_animation:
+            self._update_movement_animation()
+
+        # Update floating text fade/movement
+        if self.floating_text:
+            self._update_floating_text()
+
+        # Update wrap effect lifetime
+        if self.wrap_effect:
+            now = pygame.time.get_ticks()
+            if now - self.wrap_effect['start_time'] >= self.wrap_effect['duration']:
+                self.wrap_effect = None
+
         # Check if we're waiting to show scenes
         if self.pending_scenes:
             current_time = pygame.time.get_ticks()
@@ -534,7 +655,159 @@ class BoardBlock:
         if self.playing_game and self.current_game:
             if hasattr(self.current_game, 'update'):
                 self.current_game.update()
-    
+
+    def _update_movement_animation(self):
+        """Progress the active movement animation."""
+        animation = self.active_animation
+        if not animation:
+            return
+
+        now = pygame.time.get_ticks()
+        duration = max(1, animation.get('duration', self.animation_duration))
+        progress = (now - animation['start_time']) / duration
+        progress = max(0.0, min(1.0, progress))
+
+        start_pos = animation.get('start_pos')
+        end_pos = animation.get('end_pos')
+        if start_pos and end_pos:
+            eased = self._ease_in_out(progress)
+            self.character_pos = (
+                start_pos[0] + (end_pos[0] - start_pos[0]) * eased,
+                start_pos[1] + (end_pos[1] - start_pos[1]) * eased
+            )
+
+        if progress >= 1.0:
+            # Snap to target block at the end of the segment
+            self.current_block = animation['target_block']
+            self.update_character_position()
+
+            # Advance to the next segment if available
+            segment_index = animation['segment_index']
+            if segment_index + 1 < len(animation['blocks']):
+                animation['segment_index'] += 1
+                next_block = animation['blocks'][animation['segment_index']]
+                animation['start_pos'] = self.get_block_world_position(self.current_block)
+                animation['end_pos'] = self.get_block_world_position(next_block)
+                animation['start_time'] = now
+                animation['target_block'] = next_block
+            else:
+                final_block = self.current_block
+                show_scenes = animation.get('show_scenes', True)
+                allow_jump = animation.get('allow_jump', True)
+
+                self.active_animation = None
+                self.is_transitioning = False
+
+                if allow_jump:
+                    self._resolve_post_movement(final_block, show_scenes)
+                else:
+                    if show_scenes:
+                        self.show_block_scenes()
+
+    def _resolve_post_movement(self, final_block, show_scenes):
+        """Handle ladders/snakes or scene triggers after movement completes."""
+        jump_destination = get_block_jump_destination(final_block, from_jump=False)
+        if jump_destination:
+            label = "Stairs!" if jump_destination > final_block else "Trunk!"
+            self.start_jump_animation(final_block, jump_destination, label)
+            return
+
+        if show_scenes:
+            self.show_block_scenes()
+
+    def _ease_in_out(self, t):
+        """Smooth step interpolation."""
+        return 0.5 - 0.5 * math.cos(math.pi * t)
+
+    def _spawn_floating_text(self, text, color):
+        """Create a floating text label above the board."""
+        if not text:
+            return
+
+        font = TEXT_FONT_BOLD
+        surface = font.render(text, True, color)
+        if surface:
+            surface = surface.convert_alpha()
+
+        board_x, board_y = self.get_board_top_left()
+        self.floating_text = {
+            'surface': surface,
+            'start_time': pygame.time.get_ticks(),
+            'duration': 1200,
+            'base_pos': (
+                board_x + self.BOARD_WIDTH // 2,
+                board_y - 40
+            ),
+            'offset_y': 0,
+            'alpha': 255
+        }
+
+    def _update_floating_text(self):
+        """Fade and move the floating label upwards."""
+        if not self.floating_text:
+            return
+
+        now = pygame.time.get_ticks()
+        elapsed = now - self.floating_text['start_time']
+        duration = self.floating_text.get('duration', 1)
+        if elapsed >= duration:
+            self.floating_text = None
+            return
+
+        progress = elapsed / duration
+        self.floating_text['offset_y'] = -40 * progress
+        self.floating_text['alpha'] = max(0, min(255, int(255 * (1 - progress))))
+
+    def _draw_wrap_effect(self):
+        """Render the flash effect used for instant warps."""
+        if not self.wrap_effect or not self.character_pos:
+            return
+
+        now = pygame.time.get_ticks()
+        elapsed = now - self.wrap_effect['start_time']
+        duration = self.wrap_effect.get('duration', 1)
+        if elapsed >= duration:
+            self.wrap_effect = None
+            return
+
+        progress = max(0.0, min(1.0, elapsed / duration))
+        radius = int(self.wrap_effect.get('max_radius', 60) * progress)
+        if radius <= 0:
+            return
+
+        alpha = int(200 * (1 - progress))
+        overlay_size = radius * 2
+        overlay = pygame.Surface((overlay_size, overlay_size), pygame.SRCALPHA)
+        center = (radius, radius)
+        pygame.draw.circle(overlay, (255, 255, 255, alpha), center, radius)
+        pygame.draw.circle(overlay, (255, 215, 0, max(0, alpha - 40)), center, max(1, radius // 2), 4)
+
+        self.screen.blit(
+            overlay,
+            (self.character_pos[0] - radius, self.character_pos[1] - radius)
+        )
+
+    def _draw_floating_text(self):
+        """Draw the floating feedback text (e.g., "Stairs!", "Trunk!")."""
+        if not self.floating_text:
+            return
+
+        surface = self.floating_text.get('surface')
+        if not surface:
+            return
+
+        alpha = self.floating_text.get('alpha', 255)
+        text_surface = surface.copy()
+        text_surface.set_alpha(alpha)
+
+        base_x, base_y = self.floating_text.get('base_pos', (0, 0))
+        offset_y = self.floating_text.get('offset_y', 0)
+        pos = (
+            int(base_x - text_surface.get_width() / 2),
+            int(base_y + offset_y)
+        )
+        self.screen.blit(text_surface, pos)
+
     def get_block_info(self, block_number=None):
         """
         Get information about a specific block.
@@ -601,7 +874,13 @@ class BoardBlock:
                     15,
                     3  # Outline width
                 )
-        
+
+        # Overlay wrap effect and floating text after drawing the character
+        if self.character_pos:
+            self._draw_wrap_effect()
+
+        self._draw_floating_text()
+
         # Optional: Draw block number text
         self.draw_block_info()
     
@@ -683,6 +962,7 @@ class BoardBlock:
                             print(f"Random Card: Warping to block {warp_to}")
                             self.current_block = warp_to
                             self.update_character_position()
+                            self.trigger_wrap_effect()
                             # Show scenes for the new warped-to block
                             self.show_block_scenes()
                     elif effect_type == "good":
