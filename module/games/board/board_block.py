@@ -989,8 +989,8 @@ class BoardBlock:
         board_x, board_y = self.get_board_top_left()
         offset_x = self._current_board_offsets.get(reference_board, 0)
 
-        info_text = f"Viewing Board {self.get_viewed_board()} of {self.total_boards}"
-        info_text += f"  •  Character Block: {self.current_block}"
+        info_text = f"Board {self.get_viewed_board()} of {self.total_boards}"
+        info_text += f"  •  Block: {self.current_block}"
         text_surf = font.render(info_text, True, (0, 0, 0))
 
         text_rect = text_surf.get_rect()

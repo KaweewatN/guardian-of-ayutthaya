@@ -64,9 +64,9 @@ class Board:
         self.button_hovered_guess = False
 
         # Board navigation controls
-        self.nav_arrow_size = 68
-        self.nav_arrow_spacing = 140
-        self.nav_vertical_offset = 45
+        self.nav_arrow_size = 48
+        self.nav_arrow_spacing = 110
+        self.nav_vertical_offset = 35
         self.nav_font = pygame.font.SysFont('Arial', 26, bold=True)
         self.nav_sub_font = pygame.font.SysFont('Arial', 20)
         self.nav_prev_rect = pygame.Rect(0, 0, self.nav_arrow_size, self.nav_arrow_size)
@@ -318,38 +318,56 @@ class Board:
 
         button_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
 
-        if enabled:
-            fill_color = (255, 255, 255, 255) if hover else (235, 235, 235, 235)
-            border_color = (80, 80, 80)
-            arrow_color = (40, 40, 40)
-        else:
-            fill_color = (110, 110, 110, 160)
-            border_color = (90, 90, 90)
-            arrow_color = (170, 170, 170)
-
         radius = rect.width // 2
         center = (rect.width // 2, rect.height // 2)
-        pygame.draw.circle(button_surface, fill_color, center, radius)
-        pygame.draw.circle(button_surface, border_color, center, radius, 2)
 
-        margin = rect.width * 0.28
-        top = margin
-        bottom = rect.height - margin
-        mid_y = rect.height / 2
-        if direction == 'left':
-            points = [
-                (int(margin), int(mid_y)),
-                (int(rect.width - margin), int(top)),
-                (int(rect.width - margin), int(bottom))
-            ]
+        if enabled:
+            base_color = (214, 189, 146)
+            base_hover_color = (233, 206, 166)
+            rim_color = (124, 94, 62)
+            arrow_color = (122, 96, 60) if hover else (108, 82, 52)
+            arrow_outline = (70, 50, 32)
+            highlight_alpha = 85 if hover else 60
+            shadow_alpha = 90
         else:
-            points = [
-                (int(rect.width - margin), int(mid_y)),
-                (int(margin), int(top)),
-                (int(margin), int(bottom))
-            ]
+            base_color = (140, 126, 111)
+            base_hover_color = base_color
+            rim_color = (110, 98, 85)
+            arrow_color = (184, 170, 154)
+            arrow_outline = (150, 140, 126)
+            highlight_alpha = 0
+            shadow_alpha = 60
+
+        fill_color = base_hover_color if hover else base_color
+
+        pygame.draw.circle(button_surface, fill_color, center, radius - 1)
+        pygame.draw.circle(button_surface, rim_color, center, radius - 1, 2)
+
+        if highlight_alpha:
+            highlight_surface = pygame.Surface(rect.size, pygame.SRCALPHA)
+            highlight_radius = max(radius - 8, 4)
+            highlight_center = (center[0], center[1] - radius // 3)
+            pygame.draw.circle(
+                highlight_surface,
+                (255, 255, 255, highlight_alpha),
+                highlight_center,
+                highlight_radius
+            )
+            button_surface.blit(highlight_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+        arrow_radius = radius * 0.86
+        sign = -1 if direction == 'left' else 1
+        points = [
+            (int(center[0] - sign * arrow_radius * 0.42), int(center[1] - arrow_radius * 0.45)),
+            (int(center[0] + sign * arrow_radius * 0.10), int(center[1] - arrow_radius * 0.45)),
+            (int(center[0] + sign * arrow_radius * 0.60), int(center[1])),
+            (int(center[0] + sign * arrow_radius * 0.10), int(center[1] + arrow_radius * 0.45)),
+            (int(center[0] - sign * arrow_radius * 0.42), int(center[1] + arrow_radius * 0.45)),
+        ]
 
         pygame.draw.polygon(button_surface, arrow_color, points)
+        pygame.draw.lines(button_surface, arrow_outline, True, points, 2)
+
         self.screen.blit(button_surface, rect.topleft)
 
     def _draw_board_navigation(self):
@@ -368,28 +386,5 @@ class Board:
         self._draw_nav_button(self.nav_prev_rect, 'left', prev_enabled, self.nav_prev_hover)
         self._draw_nav_button(self.nav_next_rect, 'right', next_enabled, self.nav_next_hover)
 
-        view_board = self.board_block.get_viewed_board()
-        total_boards = self.board_block.total_board_count()
-        label_text = f"Board {view_board} / {total_boards}"
-        label_surface = self.nav_font.render(label_text, True, (30, 30, 30))
-
-        sub_text = f"Character Block {self.board_block.current_block}"
-        sub_surface = self.nav_sub_font.render(sub_text, True, (60, 60, 60))
-
-        label_rect = label_surface.get_rect(center=(self.nav_label_pos[0], self.nav_label_pos[1] - 32))
-        sub_rect = sub_surface.get_rect(center=(self.nav_label_pos[0], self.nav_label_pos[1] + 8))
-
-        backdrop_height = (sub_rect.bottom - label_rect.top) + 16
-        backdrop_width = max(label_surface.get_width(), sub_surface.get_width()) + 40
-        backdrop = pygame.Surface((backdrop_width, backdrop_height), pygame.SRCALPHA)
-        pygame.draw.rect(backdrop, (255, 255, 255, 220), backdrop.get_rect(), border_radius=18)
-        pygame.draw.rect(backdrop, (210, 210, 210), backdrop.get_rect(), 2, border_radius=18)
-
-        backdrop_rect = backdrop.get_rect()
-        backdrop_rect.center = (self.nav_label_pos[0], self.nav_label_pos[1] - 12)
-        self.screen.blit(backdrop, backdrop_rect)
-
-        label_rect.center = (self.nav_label_pos[0], label_rect.centery)
-        sub_rect.center = (self.nav_label_pos[0], sub_rect.centery)
-        self.screen.blit(label_surface, label_rect)
-        self.screen.blit(sub_surface, sub_rect)
+        # Intentionally omit descriptive text and backdrops so the navigation
+        # arrows stand on their own and better blend with the board view.
