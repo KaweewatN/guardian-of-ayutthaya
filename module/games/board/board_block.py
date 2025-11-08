@@ -368,7 +368,7 @@ class BoardBlock:
         return True
 
     def start_jump_animation(self, from_block, to_block, label_text=None):
-        """Animate a jump (stairs/trunk) between two blocks."""
+        """Animate a jump (ladder/trunk) between two blocks."""
         start_pos = self.get_block_world_position(from_block)
         end_pos = self.get_block_world_position(to_block)
         if not start_pos or not end_pos:
@@ -440,7 +440,7 @@ class BoardBlock:
                 if show_scenes:
                     jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
                     if jump_destination:
-                        label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                        label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
                         self.start_jump_animation(self.current_block, jump_destination, label)
                         return True
 
@@ -486,7 +486,7 @@ class BoardBlock:
                 if show_scenes:
                     jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
                     if jump_destination:
-                        label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                        label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
                         self.start_jump_animation(self.current_block, jump_destination, label)
                         return True
 
@@ -528,7 +528,7 @@ class BoardBlock:
             # Check for special block jumps (from_jump=False because this is normal movement)
             jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
             if jump_destination:
-                label = "Stairs!" if jump_destination > self.current_block else "Trunk!"
+                label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
                 self.start_jump_animation(self.current_block, jump_destination, label)
                 return True
 
@@ -708,7 +708,7 @@ class BoardBlock:
         """Handle ladders/snakes or scene triggers after movement completes."""
         jump_destination = get_block_jump_destination(final_block, from_jump=False)
         if jump_destination:
-            label = "Stairs!" if jump_destination > final_block else "Trunk!"
+            label = "Ladder!" if jump_destination > final_block else "Trunk!"
             self.start_jump_animation(final_block, jump_destination, label)
             return
 
@@ -788,7 +788,7 @@ class BoardBlock:
         )
 
     def _draw_floating_text(self):
-        """Draw the floating feedback text (e.g., "Stairs!", "Trunk!")."""
+        """Draw the floating feedback text (e.g., "Ladder!", "Trunk!")."""
         if not self.floating_text:
             return
 
