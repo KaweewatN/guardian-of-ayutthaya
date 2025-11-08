@@ -875,7 +875,14 @@ class BoardBlock:
             int(base_x + offset_x - text_surface.get_width() / 2),
             int(base_y + offset_y)
         )
-        self.screen.blit(text_surface, pos)
+        board_x, board_y = self.get_board_top_left()
+        min_x = board_x
+        max_x = board_x + self.BOARD_WIDTH - text_surface.get_width()
+        if max_x < min_x:
+            clamped_x = min_x
+        else:
+            clamped_x = max(min_x, min(pos[0], max_x))
+        self.screen.blit(text_surface, (clamped_x, pos[1]))
 
     def get_block_info(self, block_number=None):
         """
@@ -907,39 +914,47 @@ class BoardBlock:
         self._current_board_offsets = {}
         self._last_drawn_character_pos = None
 
+        board_surface = pygame.Surface((self.BOARD_WIDTH, self.BOARD_HEIGHT), pygame.SRCALPHA)
+        board_surface.fill((0, 0, 0, 0))
+
         def draw_board_surface(board_number, offset_x):
             if board_number is None:
                 return
 
-            self._current_board_offsets[board_number] = offset_x
-            dest_x = board_x + offset_x
+            clamped_offset = max(-self.BOARD_WIDTH, min(self.BOARD_WIDTH, offset_x))
+            self._current_board_offsets[board_number] = clamped_offset
+            dest_x = offset_x
             board_img_local = self.board_images.get(board_number)
 
             if board_img_local:
-                self.screen.blit(board_img_local, (dest_x, board_y))
+                board_surface.blit(board_img_local, (dest_x, 0))
             else:
                 pygame.draw.rect(
-                    self.screen,
+                    board_surface,
                     (200, 180, 150),
-                    (dest_x, board_y, self.BOARD_WIDTH, self.BOARD_HEIGHT)
+                    (dest_x, 0, self.BOARD_WIDTH, self.BOARD_HEIGHT)
                 )
 
             if self.character_pos and self.character_board == board_number:
-                draw_center = (self.character_pos[0] + offset_x, self.character_pos[1])
+                local_center = (
+                    int((self.character_pos[0] - board_x) + offset_x),
+                    int(self.character_pos[1] - board_y)
+                )
+                draw_center = (board_x + local_center[0], board_y + local_center[1])
                 if self.character_image:
-                    char_rect = self.character_image.get_rect(center=draw_center)
-                    self.screen.blit(self.character_image, char_rect)
+                    char_rect = self.character_image.get_rect(center=local_center)
+                    board_surface.blit(self.character_image, char_rect)
                 else:
                     pygame.draw.circle(
-                        self.screen,
+                        board_surface,
                         (255, 0, 0),
-                        draw_center,
+                        local_center,
                         15
                     )
                     pygame.draw.circle(
-                        self.screen,
+                        board_surface,
                         (255, 255, 255),
-                        draw_center,
+                        local_center,
                         15,
                         3
                     )
@@ -971,6 +986,8 @@ class BoardBlock:
         else:
             draw_board_surface(self.viewed_board, 0)
 
+        self.screen.blit(board_surface, (board_x, board_y))
+
         if self._last_drawn_character_pos:
             self._draw_wrap_effect()
 
@@ -995,6 +1012,8 @@ class BoardBlock:
 
         text_rect = text_surf.get_rect()
         text_rect.left = board_x + offset_x + 10
+        max_left = board_x + self.BOARD_WIDTH - text_rect.width - 10
+        text_rect.left = max(board_x + 10, min(text_rect.left, max_left))
         text_rect.bottom = board_y - 10
 
         self.screen.blit(text_surf, text_rect)
