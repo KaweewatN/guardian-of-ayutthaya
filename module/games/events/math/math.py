@@ -449,79 +449,79 @@ class MathEvent:
                 {"text": "-", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
                 {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
                 {"text": "+", "pos": (mid_x(slot_rects[3], slot_rects[4]), mid_y)},
-                {"text": "= 24", "pos": (slot_rects[-1].right + 90, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[-1].right + 125, mid_y)},
             ]
         if self.block_number == 20:
             return [
                 {"text": "×", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
                 {"text": "− (", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
                 {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-                {"text": ")", "pos": (slot_rects[3].right + 45, mid_y)},
-                {"text": "= 24", "pos": (slot_rects[3].right + 135, mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 20, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
         if self.block_number == 28:
             return [
-                {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
                 {"text": "(", "pos": (slot_rects[0].left - 55, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 20, mid_y)},
                 {"text": "+", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
-                {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-                {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
-                {"text": "÷", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 20, mid_y)},
+                {"text": "×", "pos": (((slot_rects[1].right + 30) + slot_rects[2].left) // 2, mid_y)},
+                {"text": ")", "pos": (slot_rects[2].right + 20, mid_y)},
+                {"text": "÷", "pos": (((slot_rects[2].right + 30) + slot_rects[3].left) // 2, mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
         if self.block_number == 37:
             return [
                 {"text": "×", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-                {"text": "(", "pos": (slot_rects[1].left - 55, mid_y)},
+                {"text": "(", "pos": (slot_rects[1].left - 10, mid_y)},
                 {"text": "−", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-                {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[2].right + 10, mid_y)},
                 {"text": "−", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
         if self.block_number == 43:
             return [
-                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 15, mid_y)},
                 {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 10, mid_y)},
                 {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 10, mid_y)},
                 {"text": "÷", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 15, mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
         if self.block_number == 49:
             return [
-                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 15, mid_y)},
                 {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 10, mid_y)},
                 {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 10, mid_y)},
                 {"text": "×", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 15, mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
         if self.block_number == 54:
             return [
-                {"text": "(", "pos": (slot_rects[0].left - 75, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 15, mid_y)},
                 {"text": "−", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-                {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 10, mid_y)},
                 {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-                {"text": "(", "pos": (slot_rects[2].left - 55, mid_y)},
+                {"text": "(", "pos": (slot_rects[2].left - 10, mid_y)},
                 {"text": "+", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-                {"text": ")", "pos": (slot_rects[3].right + 55, mid_y)},
+                {"text": ")", "pos": (slot_rects[3].right + 15, mid_y)},
                 {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
             ]
 
         return [
-            {"text": "(", "pos": (slot_rects[0].left - 95, mid_y)},
-            {"text": "(", "pos": (slot_rects[0].left - 55, mid_y)},
-            {"text": "÷", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
-            {"text": ")", "pos": (slot_rects[1].right + 55, mid_y)},
-            {"text": "×", "pos": (mid_x(slot_rects[1], slot_rects[2]), mid_y)},
-            {"text": ")", "pos": (slot_rects[2].right + 55, mid_y)},
-            {"text": "×", "pos": (mid_x(slot_rects[2], slot_rects[3]), mid_y)},
-            {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 65, mid_y)},
+                {"text": "(", "pos": (slot_rects[0].left - 25, mid_y)},
+                {"text": "÷", "pos": (mid_x(slot_rects[0], slot_rects[1]), mid_y)},
+                {"text": ")", "pos": (slot_rects[1].right + 20, mid_y)},
+                {"text": "×", "pos": (((slot_rects[1].right + 30) + slot_rects[2].left) // 2, mid_y)},
+                {"text": ")", "pos": (slot_rects[2].right + 20, mid_y)},
+                {"text": "×", "pos": (((slot_rects[2].right + 30) + slot_rects[3].left) // 2, mid_y)},
+                {"text": "= 24", "pos": (slot_rects[3].right + 125, mid_y)},
         ]
 
     def _evaluate_puzzle(self) -> None:
@@ -623,10 +623,7 @@ class MathEvent:
         if len(values) != 4:
             return False
         n1, n2, n3, n4 = values
-        try:
-            return ((n1 + n2) * n3) / n4 == 24
-        except ZeroDivisionError:
-            return False
+        return ((n1 + n2) * n3) / n4 == 24
 
     def _check_solution_block37(self, values: List[int]) -> bool:
         if len(values) != 4:
