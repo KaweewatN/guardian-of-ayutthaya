@@ -1011,10 +1011,8 @@ class BoardBlock:
         text_surf = font.render(info_text, True, (0, 0, 0))
 
         text_rect = text_surf.get_rect()
-        text_rect.left = board_x + offset_x + 10
-        max_left = board_x + self.BOARD_WIDTH - text_rect.width - 10
-        text_rect.left = max(board_x + 10, min(text_rect.left, max_left))
         text_rect.bottom = board_y - 10
+        text_rect.left = board_x
 
         self.screen.blit(text_surf, text_rect)
     
