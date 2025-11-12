@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'module'))
 from game_start.game_start import GameStart
 from stories import Stories
 from character_select.character_select import CharacterSelect
+from tutorial.tutorial import Tutorial
 from board.board import Board
 from ui.sound_button import SoundButton
 from ui.settings_button import SettingsButton
@@ -53,11 +54,12 @@ class Game:
         # Game state
         self.clock = pygame.time.Clock()
         self.running = True
-        self.game_state = "menu"  # Flow: menu -> stories -> character_select -> board
+        self.game_state = "menu"  # Flow: menu -> stories -> character_select -> tutorial -> board
 
         # Initialize modules
         self.menu = GameStart(self.screen)
         self.character_select = CharacterSelect(self.screen)
+        self.tutorial = Tutorial(self.screen)
         self.board = Board(self.screen)
 
         colors_config = {'BLACK': BLACK, 'WHITE': WHITE}
@@ -117,17 +119,23 @@ class Game:
                 result = self.character_select.handle_event(event)
                 if result:
                     if result.get('confirmed'):
-                        # Character selected - save to global state and go to board
+                        # Character selected - save to global state and go to tutorial
                         game_state.set_character(
                             result['character_id'],
                             result['character_data']
                         )
                         # Reload the character image in the board
                         self.board.reload_character()
-                        self.game_state = "board"
+                        # Reset tutorial before showing
+                        self.tutorial.reset()
+                        self.game_state = "tutorial"
                     elif result.get('cancelled'):
                         # Go back to menu
                         self.game_state = "menu"
+            elif self.game_state == "tutorial":
+                if self.tutorial.handle_event(event):
+                    # Tutorial finished, go to board
+                    self.game_state = "board"
             elif self.game_state == "board":
                 if self.board.handle_event(event):
                     # Launch the rock-paper-scissors mini-game (blocking until finished)
@@ -267,6 +275,8 @@ class Game:
             self.menu.draw()
         elif self.game_state == "character_select":
             self.character_select.draw()
+        elif self.game_state == "tutorial":
+            self.tutorial.draw()
         elif self.game_state == "board":
             self.screen.fill(BLACK)
             self.board.draw()
@@ -325,6 +335,7 @@ class Game:
         # Reinitialize modules
         self.menu = GameStart(self.screen)
         self.character_select = CharacterSelect(self.screen)
+        self.tutorial.reset()
         self.board = Board(self.screen)
         self.stories.reset()
         
