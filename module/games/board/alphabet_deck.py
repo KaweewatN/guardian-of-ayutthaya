@@ -38,8 +38,18 @@ class AlphabetDeck:
 
         self.bg_image = self._load_background()
         self.bg_rect = self.bg_image.get_rect() if self.bg_image else pygame.Rect(0, 0, 360, 240)
+        self.base_bg_size = self.bg_rect.size
 
-        self.card_size = (42, 64)
+        self.scale_factor = self._determine_scale_factor()
+        if self.bg_image and self.scale_factor != 1.0:
+            scaled_size = (
+                max(120, int(self.base_bg_size[0] * self.scale_factor)),
+                max(100, int(self.base_bg_size[1] * self.scale_factor)),
+            )
+            self.bg_image = pygame.transform.smoothscale(self.bg_image, scaled_size)
+            self.bg_rect = self.bg_image.get_rect()
+
+        self.card_size = self._scaled_card_size()
         self.top_slots: List[Tuple[int, int]] = []
         self.extra_slots: List[Tuple[int, int]] = []
         self.letter_images = self._load_letter_images()
@@ -90,13 +100,52 @@ class AlphabetDeck:
     # ------------------------------------------------------------------
     # Layout calculation
     # ------------------------------------------------------------------
+    def _determine_scale_factor(self) -> float:
+        """Compute a scaling factor so the deck matches the dice section height."""
+        if not self.bg_rect:
+            return 1.0
+
+        target_height = None
+        if self.dice:
+            dice_height = 0
+            dice_bg = getattr(self.dice, 'dice_bg_image', None)
+            if dice_bg:
+                dice_height += dice_bg.get_height()
+            else:
+                dice_height += getattr(self.dice, 'dice_size', 0) + 40
+
+            button_rect = getattr(self.dice, 'button_rect', None)
+            if button_rect:
+                dice_height += 20 + button_rect.height
+
+            if dice_height > 0:
+                target_height = dice_height
+
+        if target_height:
+            scale = target_height / self.bg_rect.height
+            scale *= 0.9
+            return max(0.35, min(scale, 1.0))
+
+        return 1.0
+
+    def _scaled_card_size(self) -> Tuple[int, int]:
+        width = max(18, int(42 * self.scale_factor))
+        height = max(28, int(64 * self.scale_factor))
+        return width, height
+
+    def _scale_length(self, base: int, minimum: int = 0) -> int:
+        scaled = int(round(base * self.scale_factor))
+        if minimum:
+            return max(minimum, scaled)
+        return scaled
+
     def _compute_layout(self) -> None:
         bg_width = self.bg_rect.width
         bg_height = self.bg_rect.height
 
         if self.dice and hasattr(self.dice, 'bg_x') and hasattr(self.dice, 'bg_y'):
-            x = self.dice.bg_x
-            y = max(140, self.dice.bg_y - bg_height - 36)
+            x = self.screen_rect.width - bg_width - 10
+            y = max(140, self.dice.bg_y - bg_height - 80)
         else:
             x = self.screen_rect.width - bg_width - 90
             y = 180
@@ -105,8 +154,8 @@ class AlphabetDeck:
 
         slot_width, slot_height = self.card_size
 
-        top_margin_x = 18
-        top_margin_y = 58
+        top_margin_x = self._scale_length(18, minimum=10)
+        top_margin_y = self._scale_length(110, minimum=30)
         if len(self.WORD) > 1:
             slot_spacing = (bg_width - 2 * top_margin_x - len(self.WORD) * slot_width) / (len(self.WORD) - 1)
         else:
@@ -122,14 +171,14 @@ class AlphabetDeck:
         # Extra slots arranged in two rows
         extra_rows = 2
         extra_columns = 8
-        extra_margin_x = 18
-        extra_margin_y = top_margin_y + slot_height + 52
+        extra_margin_x = self._scale_length(18, minimum=10)
+        extra_margin_y = top_margin_y + slot_height + self._scale_length(52, minimum=24)
         if extra_columns > 1:
             extra_spacing_x = (bg_width - 2 * extra_margin_x - extra_columns * slot_width) / (extra_columns - 1)
         else:
             extra_spacing_x = 0
         extra_spacing_x = max(6, extra_spacing_x)
-        extra_spacing_y = slot_height + 16
+        extra_spacing_y = slot_height + self._scale_length(16, minimum=8)
 
         self.extra_slots = []
         for row in range(extra_rows):
@@ -185,18 +234,6 @@ class AlphabetDeck:
             pygame.draw.rect(self.screen, (90, 58, 32), rect.inflate(6, 6), border_radius=4)
             if letter in self.letter_images:
                 self.screen.blit(self.letter_images[letter], rect)
-
-        # Text summary at bottom-left of widget
-        summary_lines = []
-        for letter in ['A', 'Y', 'U', 'T', 'H']:
-            summary_lines.append(f"{letter}: {counts.get(letter, 0)}")
-
-        summary_surface = self._render_summary(summary_lines)
-        summary_pos = (
-            self.bg_position[0] + 18,
-            self.bg_position[1] + self.bg_rect.height - summary_surface.get_height() - 18,
-        )
-        self.screen.blit(summary_surface, summary_pos)
 
     def _render_summary(self, lines: List[str]) -> pygame.Surface:
         padding = 6
