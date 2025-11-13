@@ -15,18 +15,21 @@ except ImportError:
             sys.path.insert(0, current_dir)
         from board_block import BoardBlock
 
-# Import the Dice system
+# Import the Dice system and alphabet deck widget
 try:
     from board.dice import Dice
+    from board.alphabet_deck import AlphabetDeck
 except ImportError:
     try:
         from dice import Dice
+        from alphabet_deck import AlphabetDeck
     except ImportError:
         # Fallback: add current directory to path
         current_dir = os.path.dirname(__file__)
         if current_dir not in sys.path:
             sys.path.insert(0, current_dir)
         from dice import Dice
+        from alphabet_deck import AlphabetDeck
 
 
 class Board:
@@ -50,6 +53,13 @@ class Board:
         
         # Initialize the Dice system
         self.dice = Dice(screen, self.board_block)
+
+        # Alphabet deck HUD
+        try:
+            self.alphabet_deck = AlphabetDeck(screen, self.dice)
+        except Exception as exc:
+            print(f"Warning: AlphabetDeck failed to initialize: {exc}")
+            self.alphabet_deck = None
         
         # Two buttons: Rock-Paper-Scissors (top) and Guess (below)
         self.button_rect = pygame.Rect(0, 0, 500, 100)
@@ -148,6 +158,8 @@ class Board:
 
         self.board_block.update()
         self.dice.update()
+        if self.alphabet_deck:
+            self.alphabet_deck.update()
     
     def reload_character(self):
         """Reload character image after character selection."""
@@ -175,6 +187,8 @@ class Board:
             self.board_block.draw()
             # Draw the dice system on the right side (only if not viewing scenes or playing games)
             if not self.board_block.viewing_scenes and not self.board_block.playing_game:
+                if self.alphabet_deck:
+                    self.alphabet_deck.draw()
                 self.dice.draw()
             self._draw_board_navigation()
         else:

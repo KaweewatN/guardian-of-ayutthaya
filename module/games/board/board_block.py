@@ -31,6 +31,24 @@ from fonts import TEXT_FONT_BOLD
 
 _EVENTS_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'events'))
 
+_ALPHABET_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'alphabet'))
+if _ALPHABET_BASE not in sys.path:
+    sys.path.insert(0, _ALPHABET_BASE)
+
+try:  # pragma: no cover - runtime dependency
+    from alphabet_win import AlphabetWin
+    from alphabet_lose import AlphabetLose
+except Exception as exc:  # pragma: no cover - fallback when unavailable
+    print(f"Warning: alphabet screens unavailable: {exc}")
+    AlphabetWin = None  # type: ignore
+    AlphabetLose = None  # type: ignore
+
+try:
+    from game_outcome import GameOutcomeScreen
+except Exception as exc:  # pragma: no cover
+    print(f"Warning: GameOutcomeScreen unavailable: {exc}")
+    GameOutcomeScreen = None  # type: ignore
+
 
 def _load_event_class(module_name: str, relative_path: str, class_name: str) -> Optional[type]:
     """Safely load an event class without colliding with stdlib modules."""
@@ -149,6 +167,8 @@ class BoardBlock:
         # Game event system
         self.current_game = None
         self.playing_game = False
+        self.game_completed = False
+        self.final_outcome = None
 
         # Define game event blocks
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
@@ -462,13 +482,16 @@ class BoardBlock:
     def move_forward(self, show_scenes=True):
         """
         Move character to the next block.
-        
+
         Args:
             show_scenes: Whether to show scenes for the new block (default: True)
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
+        if self.game_completed:
+            return False
+
         # Safety check: prevent movement if not fully loaded or transitioning
         if not self.is_fully_loaded or self.is_transitioning:
             return False
@@ -508,13 +531,16 @@ class BoardBlock:
     def move_backward(self, show_scenes=True):
         """
         Move character to the previous block.
-        
+
         Args:
             show_scenes: Whether to show scenes for the new block (default: True)
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
+        if self.game_completed:
+            return False
+
         # Safety check: prevent movement if not fully loaded or transitioning
         if not self.is_fully_loaded or self.is_transitioning:
             return False
@@ -554,13 +580,16 @@ class BoardBlock:
     def move_to_block(self, block_number):
         """
         Move character to a specific block number.
-        
+
         Args:
             block_number: Target block (1-60)
-            
+
         Returns:
             bool: True if successful, False if invalid block
         """
+        if self.game_completed:
+            return False
+
         # Safety check: prevent movement if not fully loaded or transitioning
         if not self.is_fully_loaded or self.is_transitioning:
             return False
@@ -615,7 +644,7 @@ class BoardBlock:
     def check_and_start_game_event(self):
         """
         Check if current block triggers a game event and start it.
-        
+
         This method is idempotent and safe to call multiple times.
         It includes safety checks to prevent:
         - Starting multiple games simultaneously
@@ -625,6 +654,9 @@ class BoardBlock:
         1. update() - When scenes finish automatically (timer-based)
         2. handle_event() - When scenes are skipped by user input
         """
+        if self.game_completed:
+            return
+
         # Safety checks: Don't start a new game if one is already active or system is busy
         if self.playing_game or self.current_game is not None:
             return
@@ -668,7 +700,95 @@ class BoardBlock:
             print(f"Starting Guess game at block {self.current_block}")
             self.current_game = GuessGame(self.screen, self.current_block)
             self.playing_game = True
-    
+
+    def _start_alphabet_reward(self, source='event'):
+        if AlphabetWin is None:
+            print("Warning: AlphabetWin unavailable")
+            return False
+        self.current_game = AlphabetWin(self.screen, source=source)
+        self.playing_game = True
+        return True
+
+    def _start_alphabet_return(self):
+        if AlphabetLose is None:
+            print("Warning: AlphabetLose unavailable")
+            return False
+        self.current_game = AlphabetLose(self.screen)
+        self.playing_game = True
+        return True
+
+    def _handle_mini_game_result(self, result, finished_game=None):
+        follow_up_started = False
+
+        effect = result.get('effect') if isinstance(result, dict) else None
+        if effect:
+            effect_type = effect.get('type')
+            if effect_type == 'warp':
+                warp_to = effect.get('value')
+                if warp_to and 1 <= warp_to <= 60:
+                    print(f"Random Card: Warping to block {warp_to}")
+                    self.current_block = warp_to
+                    self.update_character_position()
+                    self.trigger_wrap_effect()
+                    self.show_block_scenes()
+                    if warp_to == 60:
+                        self._check_for_alphabet_completion()
+                return False
+            if effect_type == 'good':
+                print("Random Card: Good card - gain letters")
+                follow_up_started = self._start_alphabet_reward(source='random')
+                return follow_up_started
+            if effect_type == 'bad':
+                print("Random Card: Bad card - return a letter")
+                follow_up_started = self._start_alphabet_return()
+                return follow_up_started
+            return False
+
+        if finished_game and AlphabetWin and isinstance(finished_game, AlphabetWin):
+            self._check_for_alphabet_completion()
+            return False
+        if finished_game and AlphabetLose and isinstance(finished_game, AlphabetLose):
+            self._check_for_alphabet_completion()
+            return False
+        if finished_game and GameOutcomeScreen and isinstance(finished_game, GameOutcomeScreen):
+            return False
+
+        result_flag = result.get('result') if isinstance(result, dict) else None
+        success_flag = result.get('success') if isinstance(result, dict) else None
+
+        if result_flag in ('win',) or success_flag is True:
+            follow_up_started = self._start_alphabet_reward(source='event')
+            return follow_up_started
+
+        if result_flag in ('alphabet-win', 'alphabet-lose'):
+            self._check_for_alphabet_completion()
+            return False
+
+        if result_flag == 'game-finished':
+            self.final_outcome = result.get('outcome')
+            self.game_completed = True
+            return False
+
+        return False
+
+    def _check_for_alphabet_completion(self):
+        if self.game_completed:
+            return
+        if self.current_block == 60:
+            outcome = 'win' if game_state.has_ayutthaya_letters() else 'lose'
+            self._show_game_outcome(outcome)
+
+    def _show_game_outcome(self, outcome):
+        if GameOutcomeScreen is None:
+            print(f"Game ended with {outcome.upper()}, but GameOutcomeScreen unavailable")
+            self.game_completed = True
+            self.final_outcome = outcome
+            return
+        self.current_game = GameOutcomeScreen(self.screen, outcome)
+        self.playing_game = True
+        self.game_completed = True
+        self.final_outcome = outcome
+
     def update(self):
         """Update board state. Call this every frame."""
         if self.active_animation:
@@ -772,6 +892,9 @@ class BoardBlock:
 
         if show_scenes:
             self.show_block_scenes()
+            self._check_for_alphabet_completion()
+        else:
+            self._check_for_alphabet_completion()
 
     def _ease_in_out(self, t):
         """Smooth step interpolation."""
@@ -1093,30 +1216,13 @@ class BoardBlock:
         if self.playing_game and self.current_game:
             result = self.current_game.handle_event(event)
             if result is not None:
-                # Game finished, return to board
+                finished_game = self.current_game
                 print(f"Game finished with result: {result}")
-                
-                # Handle Random Card effects
-                if "effect" in result:
-                    effect = result["effect"]
-                    effect_type = effect.get("type")
-                    
-                    if effect_type == "warp":
-                        warp_to = effect.get("value")
-                        if warp_to and 1 <= warp_to <= 60:
-                            print(f"Random Card: Warping to block {warp_to}")
-                            self.current_block = warp_to
-                            self.update_character_position()
-                            self.trigger_wrap_effect()
-                            # Show scenes for the new warped-to block
-                            self.show_block_scenes()
-                    elif effect_type == "good":
-                        print("Random Card: Good card - no movement effect")
-                    elif effect_type == "bad":
-                        print("Random Card: Bad card - no movement effect")
-                
+
                 self.playing_game = False
                 self.current_game = None
+
+                self._handle_mini_game_result(result, finished_game)
             return None
         
         # If viewing scenes, forward events to scene viewer
@@ -1168,7 +1274,8 @@ class BoardBlock:
             not self.is_transitioning and
             not self.viewing_scenes and
             not self.playing_game and
-            not self.pending_scenes
+            not self.pending_scenes and
+            not self.game_completed
         )
 
 
