@@ -2,6 +2,7 @@ import pygame
 import os
 import sys
 import json
+import random
 
 # Add constant directory to path for font imports
 # Import fonts: prefer package-style import (recommended). If that fails,
@@ -100,12 +101,12 @@ class GuessGame:
         self.result = None  # 'win' or 'lose'
         self.final_result = None
 
-        # UI - Optimized for 1280x832
+        # UI - Optimized for 1280x832 with centered layout
         self.input_rect = pygame.Rect(0, 0, 600, 60)
-        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 140)
+        self.input_rect.center = (self.screen_width // 2, 430)  # 10px margin top added
 
         self.submit_rect = pygame.Rect(0, 0, 220, 60)
-        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 50)
+        self.submit_rect.center = (self.screen_width // 2, 530)
 
         self.hovered = None
 
@@ -138,61 +139,37 @@ class GuessGame:
             print(f"Warning: quiz file not found at {quiz_path}")
 
     def select_question(self):
-        """Select a question from the quiz list.
-
-        Uses a deterministic selection based on block_number so every block can
-        map to a predictable question.
-        """
+        """Select a random question from the quiz list."""
         if not self.quiz:
             self.current_question = "(No questions available)"
             self.current_answer = ""
             return
 
-        idx = 0
-        try:
-            idx = int(self.block_number) % len(self.quiz)
-        except Exception:
-            idx = 0
-
-        qobj = self.quiz[idx]
+        # Select a random question from the quiz
+        qobj = random.choice(self.quiz)
         self.current_question = qobj.get('question', '')
         self.current_answer = qobj.get('answer', '')
 
     def load_images(self):
-        """Load background and result images for the given block number.
-
-        Note: intro image support has been removed — the game uses the same
-        background for intro and playing screens.
+        """Load background image from scene/empty based on block number.
+        
+        Uses the same background for all states (intro, playing, result).
         """
-        # Path for playing/background image. Use plain `{n}.png` only.
-        candidates = [
-            f"assets/scene/event/guess/blocks/{self.block_number}.png",
-        ]
+        # Use scene/empty/{block_number}.png as background
+        bg_path = f"assets/scene/empty/{self.block_number}.png"
+        
         self.background = None
-        for bg_path in candidates:
-            if os.path.exists(bg_path):
-                try:
-                    img = pygame.image.load(bg_path)
-                    self.background = pygame.transform.scale(img, (self.screen_width, self.screen_height))
-                    break
-                except Exception as e:
-                    print(f"Warning: failed to load bg image {bg_path}: {e}")
-                    self.background = None
-        # If none found, self.background remains None and we fall back to BG_COLOR
-
-        # Result images (win/lose)
-        self.result_images = {"win": None, "lose": None}
-        for res in ["win", "lose"]:
-            res_path = f"assets/scene/event/guess/blocks/{self.block_number}-{res}.png"
-            if os.path.exists(res_path):
-                try:
-                    img = pygame.image.load(res_path)
-                    self.result_images[res] = pygame.transform.scale(img, (self.screen_width, self.screen_height))
-                except Exception as e:
-                    print(f"Warning: failed to load result image {res_path}: {e}")
-                    self.result_images[res] = None
-            else:
-                self.result_images[res] = None
+        if os.path.exists(bg_path):
+            try:
+                img = pygame.image.load(bg_path)
+                self.background = pygame.transform.scale(img, (self.screen_width, self.screen_height))
+                print(f"Loaded guess background: scene/empty/{self.block_number}.png")
+            except Exception as e:
+                print(f"Warning: failed to load bg image {bg_path}: {e}")
+                self.background = None
+        else:
+            print(f"Warning: background not found at {bg_path}, using fallback color")
+            self.background = None
 
     def draw_intro(self):
         # Background
@@ -207,18 +184,18 @@ class GuessGame:
         white_mask.set_alpha(204)  # 80% opacity
         self.screen.blit(white_mask, (0, 0))
 
-        # Title at top center
+        # Title centered higher
         title = self.title_font.render("Guess the Answer", True, self.BLACK)
-        title_rect = title.get_rect(center=(self.screen_width // 2, 120))
+        title_rect = title.get_rect(center=(self.screen_width // 2, 180))
         self.screen.blit(title, title_rect)
 
-        # Subtitle/instruction below title
+        # Subtitle/instruction below title with more spacing
         subtitle = self.text_font.render("Type the answer and press ENTER or click Submit", True, self.BLACK)
-        subtitle_rect = subtitle.get_rect(center=(self.screen_width // 2, 200))
+        subtitle_rect = subtitle.get_rect(center=(self.screen_width // 2, 250))
         self.screen.blit(subtitle, subtitle_rect)
 
-        # Question preview (wrapped, centered area)
-        q_rect = pygame.Rect(200, 280, self.screen_width - 400, 200)
+        # Question preview (wrapped, centered area) - moved to true center
+        q_rect = pygame.Rect(240, 320, self.screen_width - 480, 160)
         self.draw_wrapped_text(self.current_question, self.current_question_font, self.BLACK, q_rect)
 
         # Instruction to continue (at bottom like random_event)
@@ -239,13 +216,13 @@ class GuessGame:
         white_mask.set_alpha(204)  # 80% opacity
         self.screen.blit(white_mask, (0, 0))
 
-        # Title at top
+        # Title centered at top
         title = self.title_font.render("Guess the Answer", True, self.BLACK)
-        title_rect = title.get_rect(center=(self.screen_width // 2, 120))
+        title_rect = title.get_rect(center=(self.screen_width // 2, 150))
         self.screen.blit(title, title_rect)
 
-        # Question text (wrap if needed, centered) - same position as intro
-        question_rect = pygame.Rect(200, 280, self.screen_width - 400, 200)
+        # Question text (wrap if needed, centered) - centered vertically
+        question_rect = pygame.Rect(240, 240, self.screen_width - 480, 140)
         self.draw_wrapped_text(self.current_question, self.current_question_font, self.BLACK, question_rect)
 
         # Input box - Draw with clear white background
@@ -291,43 +268,36 @@ class GuessGame:
         self.screen.blit(hint, hint_rect)
 
     def draw_result(self):
-        # If full-screen result image exists show it, otherwise fallback to text
-        img = None
-        if hasattr(self, 'result_images'):
-            img = self.result_images.get(self.result)
-
-        if img:
-            self.screen.blit(img, (0, 0))
+        # Background (same as intro/playing)
+        if getattr(self, 'background', None):
+            self.screen.blit(self.background, (0, 0))
         else:
-            if getattr(self, 'background', None):
-                self.screen.blit(self.background, (0, 0))
-            else:
-                self.screen.fill(self.BG_COLOR)
+            self.screen.fill(self.BG_COLOR)
 
-            # Create white opacity mask
-            white_mask = pygame.Surface((self.screen_width, self.screen_height))
-            white_mask.fill((255, 255, 255))
-            white_mask.set_alpha(204)  # 80% opacity
-            self.screen.blit(white_mask, (0, 0))
+        # Create white opacity mask
+        white_mask = pygame.Surface((self.screen_width, self.screen_height))
+        white_mask.fill((255, 255, 255))
+        white_mask.set_alpha(204)  # 80% opacity
+        self.screen.blit(white_mask, (0, 0))
 
-            # Result title (like random_event "Your Card")
-            if self.result == 'win':
-                result_title = "Correct!"
-                result_color = (34, 139, 34)  # Green
-            else:
-                result_title = "Incorrect!"
-                result_color = (220, 20, 60)  # Red
+        # Result title (centered vertically)
+        if self.result == 'win':
+            result_title = "Correct!"
+            result_color = (34, 139, 34)  # Green
+        else:
+            result_title = "Incorrect!"
+            result_color = (220, 20, 60)  # Red
 
-            title_surf = self.title_font.render(result_title, True, result_color)
-            title_rect = title_surf.get_rect(center=(self.screen_width // 2, 200))
-            self.screen.blit(title_surf, title_rect)
+        title_surf = self.title_font.render(result_title, True, result_color)
+        title_rect = title_surf.get_rect(center=(self.screen_width // 2, 280))
+        self.screen.blit(title_surf, title_rect)
 
-            # Show correct answer if wrong
-            if self.result == 'lose':
-                answer_text = f"The correct answer is: {self.current_answer}"
-                answer_surf = self.subtitle_font.render(answer_text, True, self.BLACK)
-                answer_rect = answer_surf.get_rect(center=(self.screen_width // 2, 350))
-                self.screen.blit(answer_surf, answer_rect)
+        # Show correct answer if wrong
+        if self.result == 'lose':
+            answer_text = f"The correct answer is: {self.current_answer}"
+            answer_surf = self.subtitle_font.render(answer_text, True, self.BLACK)
+            answer_rect = answer_surf.get_rect(center=(self.screen_width // 2, 400))
+            self.screen.blit(answer_surf, answer_rect)
 
         # Instruction at bottom (like random_event)
         instr = self.text_font.render("Press SPACE or CLICK to continue", True, self.BLACK)
@@ -469,10 +439,10 @@ class GuessGame:
         self.screen_width = 1280
         self.screen_height = 832
         
-        # Recalculate input rect position
+        # Recalculate input rect position (centered with 10px margin top)
         self.input_rect = pygame.Rect(0, 0, 600, 60)
-        self.input_rect.center = (self.screen_width // 2, self.screen_height // 2 + 140)
+        self.input_rect.center = (self.screen_width // 2, 470)
         
-        # Recalculate submit button position
+        # Recalculate submit button position (centered)
         self.submit_rect = pygame.Rect(0, 0, 220, 60)
-        self.submit_rect.center = (self.screen_width // 2, self.input_rect.bottom + 50)
+        self.submit_rect.center = (self.screen_width // 2, 530)
