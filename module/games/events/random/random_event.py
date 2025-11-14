@@ -49,22 +49,22 @@ class RandomCard:
     
     # Card configuration for each block
     BLOCK_CARDS = {
-        4: ["bad", "warp-10", "warp-6"],
-        8: ["good", "warp-20", "warp-14"],
-        12: ["warp-6", "good", "warp-14"],
-        16: ["warp-2", "bad", "warp-20"],
-        19: ["warp-2", "warp-27", "good"],
-        23: ["good", "warp-20", "warp-14"],
-        26: ["warp-2", "good", "warp-27"],
-        29: ["bad", "good", "warp-6"],
-        33: ["warp-6", "bad", "warp-10"],
-        36: ["bad", "warp-2", "warp-20"],
-        39: ["good", "warp-14", "warp-6"],
-        43: ["good", "warp-20", "warp-14"],
-        45: ["bad", "good", "warp-27"],
-        48: ["warp-2", "bad", "warp-20"],
-        52: ["warp-2", "good", "warp-27"],
-        56: ["bad", "warp-14", "warp-20"],
+        4: ["good", "forward-7", "backward-2"],  # Divine Blessing, Fell Off Bridge, Encountered Storm
+        8: ["good", "forward-3", "bad"],  # Divine Blessing, Banished from Forest, Careless Mistake
+        12: ["good", "good", "forward-3"],  # Divine Blessing, Divine Blessing, Banished from Forest
+        16: ["good", "bad", "bad"],  # Divine Blessing, Careless Mistake, Careless Mistake
+        19: ["bad", "backward-4", "good"],  # Careless Mistake, Dead End, Divine Blessing
+        23: ["good", "backward-4", "forward-1"],  # Divine Blessing, Dead End, Whirlwind Shortcut
+        26: ["forward-5", "good", "backward-2"],  # Encountered a Tiger, Divine Blessing, Encountered Storm
+        29: ["bad", "good", "backward-6"],  # Careless Mistake, Divine Blessing, Elephant Spirit Appears
+        33: ["forward-3", "bad", "backward-6"],  # Banished from Forest, Careless Mistake, Elephant Spirit Appears
+        36: ["bad", "forward-7", "backward-8"],  # Careless Mistake, Fell Off Bridge, Tangling Roots
+        39: ["good", "forward-3", "backward-4"],  # Divine Blessing, Banished from Forest, Dead End
+        42: ["good", "forward-5", "backward-2"],  # Divine Blessing, Encountered a Tiger, Encountered Storm
+        45: ["bad", "good", "backward-4"],  # Careless Mistake, Divine Blessing, Dead End
+        48: ["forward-1", "bad", "backward-8"],  # Whirlwind Shortcut, Careless Mistake, Tangling Roots
+        52: ["forward-3", "good", "backward-6"],  # Banished from Forest, Divine Blessing, Elephant Spirit Appears
+        56: ["bad", "backward-12", "forward-1"],  # Careless Mistake, Secret Curse, Whirlwind Shortcut
     }
     
     def __init__(self, screen, block_number):
@@ -157,7 +157,7 @@ class RandomCard:
         
         # Load all possible card face images
         self.card_faces = {}
-        card_types = ["good", "bad", "warp-2", "warp-6", "warp-10", "warp-14", "warp-20", "warp-27"]
+        card_types = ["good", "bad", "forward-1", "forward-3", "forward-5", "forward-7", "backward-2", "backward-4", "backward-6", "backward-8", "backward-12"]
         
         for card_type in card_types:
             card_path = os.path.join(base_path, 'assets', 'random-card', f'{card_type}.png')
@@ -334,20 +334,26 @@ class RandomCard:
         Parse card type and return effect
         
         Args:
-            card_type: Card type (e.g., "good", "bad", "warp-10")
+            card_type: Card type (e.g., "good", "bad", "forward-7", "backward-2")
             
         Returns:
-            dict: {"type": "good"/"bad"/"warp", "value": block_number or None}
+            dict: {"type": "good"/"bad"/"warp", "value": spaces_to_move or None}
+                  For warp: positive value = move forward, negative value = move backward
         """
         if card_type == "good":
             return {"type": "good", "value": None}
         elif card_type == "bad":
             return {"type": "bad", "value": None}
-        elif card_type.startswith("warp-"):
-            # Extract block number from card name (e.g., "warp-10" -> 10)
-            block_number = int(card_type.split("-")[1])
-            print(f"Random Card: {card_type} -> Warp to block {block_number}")
-            return {"type": "warp", "value": block_number}
+        elif card_type.startswith("forward-"):
+            # Extract forward movement (e.g., "forward-7" -> +7)
+            spaces = int(card_type.replace("forward-", ""))
+            print(f"Random Card: {card_type} -> Move forward {spaces} spaces")
+            return {"type": "warp", "value": spaces}
+        elif card_type.startswith("backward-"):
+            # Extract backward movement (e.g., "backward-2" -> -2)
+            spaces = int(card_type.replace("backward-", ""))
+            print(f"Random Card: {card_type} -> Move backward {spaces} spaces")
+            return {"type": "warp", "value": -spaces}
         else:
             return {"type": "unknown", "value": None}
     

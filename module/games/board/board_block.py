@@ -174,7 +174,7 @@ class BoardBlock:
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
         self.rps_blocks = [6, 17, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
-        self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 43, 45, 48, 52, 56]
+        self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 42, 45, 48, 52, 56]
 
         # Movement animation state
         self.active_animation = None
@@ -724,15 +724,23 @@ class BoardBlock:
         if effect:
             effect_type = effect.get('type')
             if effect_type == 'warp':
-                warp_to = effect.get('value')
-                if warp_to and 1 <= warp_to <= 60:
-                    print(f"Random Card: Warping to block {warp_to}")
-                    self.current_block = warp_to
-                    self.update_character_position()
-                    self.trigger_wrap_effect()
-                    self.show_block_scenes()
-                    if warp_to == 60:
-                        self._check_for_alphabet_completion()
+                movement = effect.get('value')
+                if movement is not None:
+                    # Calculate new block position with bounds checking (1-60)
+                    new_block = self.current_block + movement
+                    new_block = max(1, min(60, new_block))  # Clamp between 1 and 60
+                    
+                    if new_block != self.current_block:
+                        direction = "forward" if movement > 0 else "backward"
+                        print(f"Random Card: Moving {direction} {abs(movement)} spaces from {self.current_block} to {new_block}")
+                        self.current_block = new_block
+                        self.update_character_position()
+                        self.trigger_wrap_effect()
+                        self.show_block_scenes()
+                        if new_block == 60:
+                            self._check_for_alphabet_completion()
+                    else:
+                        print(f"Random Card: Already at boundary, staying at block {self.current_block}")
                 return False
             if effect_type == 'good':
                 print("Random Card: Good card - gain letters")
@@ -879,8 +887,12 @@ class BoardBlock:
                 if allow_jump:
                     self._resolve_post_movement(final_block, show_scenes)
                 else:
+                    # Jump animation completed - show scenes and check for game completion
                     if show_scenes:
                         self.show_block_scenes()
+                        self._check_for_alphabet_completion()
+                    else:
+                        self._check_for_alphabet_completion()
 
     def _resolve_post_movement(self, final_block, show_scenes):
         """Handle ladders/snakes or scene triggers after movement completes."""
