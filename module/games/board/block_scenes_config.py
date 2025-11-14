@@ -41,8 +41,11 @@ def get_block_scene_sequence(block_number):
         'type': 'npc-details'
     })
     
-    # Scene 4: NPC Dialogue (blocks 21-60 only, based on available files)
-    if 21 <= block_number <= 60:
+    # Scene 4: NPC Dialogue (only for blocks with available dialogue files)
+    dialogue_blocks = [1, 2, 4, 8, 12, 13, 16, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+                       31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+                       48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60]
+    if block_number in dialogue_blocks:
         scenes.append({
             'folder': 'npc-dialogue',
             'filename': f'{block_number}.png',
@@ -85,8 +88,9 @@ def get_block_jump_destination(block_number, from_jump=False):
     forward_jumps = {
         3: 6,
         27: 35,
+        32: 47,
         38: 42,
-        50: 55
+        50: 58
     }
     
     # Backward jumps (snakes/traps that move you back)
@@ -94,8 +98,7 @@ def get_block_jump_destination(block_number, from_jump=False):
         13: 8,
         21: 16,
         30: 23,
-        35: 28,
-        44: 38,
+        44: 37,
         55: 49
     }
     

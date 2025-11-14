@@ -172,9 +172,9 @@ class BoardBlock:
 
         # Define game event blocks
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
-        self.rps_blocks = [6, 17, 40, 46, 57]
+        self.rps_blocks = [6, 17, 25, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
-        self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 42, 45, 48, 52, 56]
+        self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 33, 36, 39, 42, 45, 48, 52, 56]
 
         # Movement animation state
         self.active_animation = None

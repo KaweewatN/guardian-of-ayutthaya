@@ -19,6 +19,7 @@ from tutorial.tutorial import Tutorial
 from board.board import Board
 from ui.sound_button import SoundButton
 from ui.settings_button import SettingsButton
+from ui.tutorial_button import TutorialButton
 from events.rock_paper_scissors.rock_paper_scissors import RockPaperScissors
 from events.guess.guess import GuessGame
 from game_state import game_state
@@ -77,6 +78,11 @@ class Game:
         self.sound_button = SoundButton(self.screen, position='left', margin_x=70, quit_button_width=0)
         # Settings button with popup (positioned on right side) - includes quit and restart
         self.settings_button = SettingsButton(self.screen, position='left', margin_x=30)
+        # Tutorial button (positioned 5px to the left of sound button, same vertical position)
+        self.tutorial_button = TutorialButton(self.screen, position='left', margin_y=20)
+        
+        # Tutorial overlay state
+        self.showing_tutorial_overlay = False
         
     def handle_events(self):
         """Handle all game events"""
@@ -101,6 +107,24 @@ class Game:
                     return
             except Exception:
                 pass
+            
+            # Handle tutorial button (only on board screen)
+            if self.game_state == "board" and not self.showing_tutorial_overlay:
+                try:
+                    if self.tutorial_button.handle_event(event):
+                        # Open tutorial overlay
+                        self.showing_tutorial_overlay = True
+                        self.tutorial.reset()
+                        self.tutorial.set_skip_returns_to_game(True)
+                except Exception:
+                    pass
+            
+            # Handle tutorial overlay events
+            if self.showing_tutorial_overlay:
+                if self.tutorial.handle_event(event):
+                    # Tutorial finished or skipped - return to game
+                    self.showing_tutorial_overlay = False
+                return
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and self.game_state == "stories":
@@ -280,6 +304,14 @@ class Game:
         elif self.game_state == "board":
             self.screen.fill(BLACK)
             self.board.draw()
+            # Draw tutorial button on board
+            try:
+                self.tutorial_button.draw()
+            except Exception:
+                pass
+            # Draw tutorial overlay if showing
+            if self.showing_tutorial_overlay:
+                self.tutorial.draw()
         elif self.game_state == "stories":
             self.stories.draw_story(self.stories.current_story)
 
@@ -338,6 +370,9 @@ class Game:
         self.tutorial.reset()
         self.board = Board(self.screen)
         self.stories.reset()
+        
+        # Reset tutorial overlay state
+        self.showing_tutorial_overlay = False
         
         print("Game restarted successfully!")
         

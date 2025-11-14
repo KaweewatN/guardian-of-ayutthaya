@@ -68,6 +68,10 @@ class Tutorial:
         # Tutorial pages with content
         self.pages = self.create_tutorial_pages()
         
+        # Load page images
+        self.page_images = {}
+        self.load_page_images()
+        
         # Navigation buttons
         self.create_buttons()
         
@@ -75,6 +79,10 @@ class Tutorial:
         self.next_hovered = False
         self.prev_hovered = False
         self.skip_hovered = False
+        
+        # Skip behavior flag
+        self.skip_returns_to_game = False
+        self._was_skipped = False
     
     def load_background(self):
         """Load tutorial background image"""
@@ -92,6 +100,38 @@ class Tutorial:
         else:
             print(f"Warning: tutorial-bg.png not found at {bg_path}")
             self.background = None
+    
+    def load_page_images(self):
+        """Load images for each tutorial page (1.png to 10.png)"""
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        tutorial_assets = os.path.join(base_path, 'assets', 'tutorial')
+        
+        # Try to load images 1.png through 10.png
+        for i in range(1, 11):
+            img_path = os.path.join(tutorial_assets, f'{i}.png')
+            if os.path.exists(img_path):
+                try:
+                    img = pygame.image.load(img_path).convert_alpha()
+                    # Scale image bigger (max width 800px, max height 350px)
+                    img_rect = img.get_rect()
+                    max_width = 800
+                    max_height = 350
+                    
+                    # Calculate scale factor to fit within constraints
+                    scale_w = max_width / img_rect.width if img_rect.width > max_width else 1
+                    scale_h = max_height / img_rect.height if img_rect.height > max_height else 1
+                    scale = min(scale_w, scale_h)
+                    
+                    if scale < 1:
+                        new_width = int(img_rect.width * scale)
+                        new_height = int(img_rect.height * scale)
+                        img = pygame.transform.smoothscale(img, (new_width, new_height))
+                    
+                    self.page_images[i - 1] = img  # Store by page index (0-based)
+                    print(f"Loaded tutorial image: {i}.png")
+                except Exception as e:
+                    print(f"Error loading {i}.png: {e}")
+            # If image doesn't exist, that's okay - not all pages need images
         
     def create_tutorial_pages(self):
         """Create tutorial page content"""
@@ -129,7 +169,7 @@ class Tutorial:
                     "",
                     "1. Math Challenge - Solve math problems correctly",
                     "2. Rock-Paper-Scissors - Win the classic game",
-                    "3. Guess Game - Answer trivia questions about Thailand",
+                    "3. Guess Game - Answer questions about Brain teasers",
                     "4. Random Card - Draw a card for random effects",
                     "",
                     "Complete events to continue your journey!",
@@ -165,9 +205,8 @@ class Tutorial:
                 "content": [
                     "Blocks: 9, 14, 31, 51",
                     "",
-                    "• Answer questions about Thai history and culture",
-                    "• Multiple choice or type your answer",
-                    "• Test your knowledge about ancient Ayutthaya!",
+                    "• Answer questions about Brain teasers",
+                    "• Type your answer",
                 ],
                 "icon": "guess"
             },
@@ -177,12 +216,9 @@ class Tutorial:
                     "Blocks: 4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 43, 45, 48, 52, 56",
                     "",
                     "• Draw one card from three face-down cards",
-                    "• Effects:",
                     "  - Good Card: Positive effect",
                     "  - Bad Card: Negative effect", 
                     "  - Warp Card: Teleport to a different block",
-                    "",
-                    "Choose wisely - luck is on your side!",
                 ],
                 "icon": "random"
             },
@@ -208,8 +244,6 @@ class Tutorial:
                     "3. Think strategically in Rock-Paper-Scissors",
                     "4. Calculate carefully in Math challenges",
                     "5. Random cards can help or hinder - embrace the chaos!",
-                    "",
-                    "Most importantly: Have fun on your journey!",
                 ],
                 "icon": "tips"
             },
@@ -313,9 +347,12 @@ class Tutorial:
         line_end = (self.screen_width // 2 + 300, line_y)
         pygame.draw.line(self.screen, self.GOLD, line_start, line_end, 4)
         
-        # Draw content lines with shadow for readability
-        y_offset = 220
-        line_spacing = 40
+        # Check if we have an image for this page
+        has_image = self.current_page in self.page_images
+        
+        # Draw ALL content lines with shadow for readability (no truncation)
+        y_offset = 200
+        line_spacing = 35 if has_image else 40
         
         for line in page["content"]:
             if line == "":
@@ -341,6 +378,29 @@ class Tutorial:
             text_rect = text_surface.get_rect(center=(self.screen_width // 2, y_offset))
             self.screen.blit(text_surface, text_rect)
             y_offset += line_spacing
+        
+        # Draw image if available (centered horizontally, below text with 5px vertical margin)
+        if has_image:
+            image = self.page_images[self.current_page]
+            img_rect = image.get_rect()
+            img_x = (self.screen_width - img_rect.width) // 2
+            img_y = y_offset + 5  # 5px vertical margin below text
+            
+            # Draw darker yellow/gold border around image (6px thick) for pages 1-8
+            # Pages 9 and 10 don't have border
+            if self.current_page < 8:
+                border_thickness = 6
+                border_color = self.GOLD  # Darker gold color (255, 215, 0)
+                border_rect = pygame.Rect(
+                    img_x - border_thickness,
+                    img_y - border_thickness,
+                    img_rect.width + (border_thickness * 2),
+                    img_rect.height + (border_thickness * 2)
+                )
+                pygame.draw.rect(self.screen, border_color, border_rect, border_thickness)
+            
+            # Draw the image
+            self.screen.blit(image, (img_x, img_y))
     
     def draw(self):
         """Draw the current tutorial page"""
@@ -410,6 +470,7 @@ class Tutorial:
                 # Skip button
                 elif self.skip_button.collidepoint(event.pos):
                     self.finished = True
+                    self._was_skipped = True
                     return True
         
         elif event.type == pygame.KEYDOWN:
@@ -428,6 +489,7 @@ class Tutorial:
             # Escape - skip tutorial
             elif event.key == pygame.K_ESCAPE:
                 self.finished = True
+                self._was_skipped = True
                 return True
         
         return False
@@ -436,6 +498,19 @@ class Tutorial:
         """Reset tutorial to first page"""
         self.current_page = 0
         self.finished = False
+    
+    def set_skip_returns_to_game(self, returns_to_game=True):
+        """
+        Set whether skipping tutorial returns to game or not
+        
+        Args:
+            returns_to_game: If True, skip button returns to game instead of finishing tutorial
+        """
+        self.skip_returns_to_game = returns_to_game
+    
+    def is_skipped(self):
+        """Check if tutorial was skipped (vs completed)"""
+        return hasattr(self, '_was_skipped') and self._was_skipped
 
 
 # Test the tutorial system
