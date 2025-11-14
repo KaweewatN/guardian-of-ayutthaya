@@ -52,8 +52,8 @@ class AlphabetWin:
         self._result_reported = False
 
         # Pre-render texts
-        source_text = "You won the challenge!" if source == 'event' else "Good fortune!"
-        self.title_surface = self.title_font.render(source_text, True, (255, 230, 180))
+        source_text = "Congratulations!" if source == 'event' else "Good fortune!"
+        self.title_surface = self.title_font.render(source_text, True, (101, 67, 33))  # Darker brown
 
         if self.drawn_letters:
             letters_str = ', '.join(self.drawn_letters)
@@ -61,8 +61,8 @@ class AlphabetWin:
         else:
             message = "The deck is empty. No cards to draw."
 
-        self.message_surface = self.text_font.render(message, True, (255, 255, 255))
-        self.prompt_surface = self.button_font.render("Click or press SPACE to continue", True, (255, 214, 153))
+        self.message_surface = self.text_font.render(message, True, (0, 0, 0))  # Black
+        self.prompt_surface = self.text_font.render("Press SPACE or CLICK to continue", True, (255, 255, 255))
 
     # ------------------------------------------------------------------
     # Loading helpers
@@ -111,15 +111,17 @@ class AlphabetWin:
         else:
             self.screen.fill((70, 50, 30))
 
-        # Draw title and message near top (moved down 30 pixels)
+        # Draw title near top
         title_rect = self.title_surface.get_rect(center=(self.screen_rect.centerx, 185))
         self.screen.blit(self.title_surface, title_rect)
 
-        message_rect = self.message_surface.get_rect(center=(self.screen_rect.centerx, 260))
-        self.screen.blit(self.message_surface, message_rect)
-
         # Draw the cards centered horizontally
         self._draw_letter_cards()
+
+        # Draw message below the cards (cards are at centery-100 with height 240)
+        message_y = self.screen_rect.centery - 100 + 240 + 60  # Card bottom + 40px spacing
+        message_rect = self.message_surface.get_rect(center=(self.screen_rect.centerx, message_y))
+        self.screen.blit(self.message_surface, message_rect)
 
         prompt_rect = self.prompt_surface.get_rect(center=(self.screen_rect.centerx, self.screen_rect.height - 90))
         self.screen.blit(self.prompt_surface, prompt_rect)
@@ -138,7 +140,7 @@ class AlphabetWin:
 
         total_width = sum(card.get_width() for card in cards) + spacing * (len(cards) - 1)
         start_x = self.screen_rect.centerx - total_width // 2
-        y = self.screen_rect.centery - 40
+        y = self.screen_rect.centery - 80  # Moved up from -40
 
         for card in cards:
             self.screen.blit(card, (start_x, y))

@@ -38,7 +38,7 @@ class AlphabetLose:
         self.has_cards = bool(self.cards)
 
         self.card_size = (140, 210)
-        self.background = self._load_background('return.png' if self.has_cards else 'return-empty.png')
+        self.background = self._load_background('tutorial-bg.png')
         self.letter_images = self._load_letter_images()
         self.card_rects: List[Tuple[pygame.Rect, str]] = []
         self.hovered_index: Optional[int] = None
@@ -47,16 +47,16 @@ class AlphabetLose:
         self.button_font = BUTTON_FONT
 
         if self.has_cards:
-            self.instruction_surface = self.text_font.render(
-                "Select one card to return to the deck", True, (255, 230, 180)
+            self.instruction_surface = self.button_font.render(
+                "Select one card to return to the deck", True, (210, 180, 120)  # Light brown
             )
         else:
-            self.instruction_surface = self.text_font.render(
-                "You do not have any alphabet cards yet.", True, (255, 230, 180)
+            self.instruction_surface = self.button_font.render(
+                "You do not have any alphabet cards yet.", True, (210, 180, 120)  # Light brown
             )
 
-        self.prompt_surface = self.button_font.render(
-            "Click or press SPACE to continue", True, (255, 214, 153)
+        self.prompt_surface = self.text_font.render(
+            "Press SPACE or CLICK to continue", True, (255, 255, 255)
         )
 
         self._result_reported = False
@@ -72,7 +72,8 @@ class AlphabetLose:
         return os.path.join(base, 'assets', 'alphabet', *paths)
 
     def _load_background(self, filename: str) -> Optional[pygame.Surface]:
-        path = self._assets_path(filename)
+        base = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+        path = os.path.join(base, 'assets', 'core', filename)
         if os.path.exists(path):
             try:
                 img = pygame.image.load(path).convert_alpha()
@@ -80,7 +81,7 @@ class AlphabetLose:
             except Exception as exc:  # pragma: no cover
                 print(f"Warning: failed to load {path}: {exc}")
         else:
-            print(f"Warning: alphabet background not found: {path}")
+            print(f"Warning: background not found: {path}")
         return None
 
     def _load_letter_images(self) -> dict[str, pygame.Surface]:
