@@ -139,7 +139,7 @@ class AlphabetLose:
         instruction_rect = self.instruction_surface.get_rect(center=(self.screen_rect.centerx, 160))
         self.screen.blit(self.instruction_surface, instruction_rect)
 
-        prompt_rect = self.prompt_surface.get_rect(center=(self.screen_rect.centerx, self.screen_rect.height - 120))
+        prompt_rect = self.prompt_surface.get_rect(center=(self.screen_rect.centerx, self.screen_rect.height - 90))
         self.screen.blit(self.prompt_surface, prompt_rect)
 
         if not self.has_cards:

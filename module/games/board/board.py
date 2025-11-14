@@ -191,6 +191,10 @@ class Board:
                     self.alphabet_deck.draw()
                 self.dice.draw()
             self._draw_board_navigation()
+            
+            # Draw alphabet deck on top of everything if expanded
+            if self.alphabet_deck and self.alphabet_deck.is_expanded:
+                self.alphabet_deck.draw()
         else:
             # Draw both buttons when in button mode (legacy)
             color1 = self.button_hover_color if self.button_hovered else self.button_color
@@ -217,6 +221,20 @@ class Board:
             except Exception as e:
                 print(f"Error handling event in active game: {e}")
             return None
+
+        # Handle alphabet deck events first (if expanded, it should capture all events)
+        if self.alphabet_deck:
+            if self.alphabet_deck.is_expanded:
+                # When expanded, alphabet deck handles all events
+                handled = self.alphabet_deck.handle_event(event)
+                if handled:
+                    return None
+                # Even if not handled, don't pass events to other components when deck is expanded
+                if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+                    return None
+            else:
+                # When not expanded, only handle events on the deck area
+                self.alphabet_deck.handle_event(event)
 
         # Handle UI mode toggle (for testing)
         if event.type == pygame.KEYDOWN and event.key == pygame.K_TAB:

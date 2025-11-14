@@ -111,17 +111,17 @@ class AlphabetWin:
         else:
             self.screen.fill((70, 50, 30))
 
-        # Draw title and message near top
-        title_rect = self.title_surface.get_rect(center=(self.screen_rect.centerx, 140))
+        # Draw title and message near top (moved down 30 pixels)
+        title_rect = self.title_surface.get_rect(center=(self.screen_rect.centerx, 185))
         self.screen.blit(self.title_surface, title_rect)
 
-        message_rect = self.message_surface.get_rect(center=(self.screen_rect.centerx, 220))
+        message_rect = self.message_surface.get_rect(center=(self.screen_rect.centerx, 260))
         self.screen.blit(self.message_surface, message_rect)
 
         # Draw the cards centered horizontally
         self._draw_letter_cards()
 
-        prompt_rect = self.prompt_surface.get_rect(center=(self.screen_rect.centerx, self.screen_rect.height - 120))
+        prompt_rect = self.prompt_surface.get_rect(center=(self.screen_rect.centerx, self.screen_rect.height - 90))
         self.screen.blit(self.prompt_surface, prompt_rect)
         self._continue_rect = prompt_rect
 
