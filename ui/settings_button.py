@@ -34,7 +34,7 @@ class SettingsButton:
     
     def __init__(self, screen, width=50, height=50, margin_x=20, margin_y=20,
                  color=(139, 90, 43), hover_color=(180, 120, 60),
-                 border=(90, 60, 30), position='right'):
+                 border=(90, 60, 30), position='right', popup_title="Settings"):
         """
         Initialize the settings button.
         
@@ -59,6 +59,7 @@ class SettingsButton:
         self.border = border
         self.position = position
         self.hover = False
+        self.popup_title = popup_title
         
         # Popup state
         self.popup_visible = False
@@ -236,7 +237,7 @@ class SettingsButton:
         pygame.draw.rect(self.screen, border_color, self.popup_rect, 4, border_radius=20)
         
         # Draw title
-        title_text = self.title_font.render("Settings", True, (60, 40, 20))
+        title_text = self.title_font.render(self.popup_title, True, (60, 40, 20))
         title_rect = title_text.get_rect(centerx=self.popup_rect.centerx, 
                                          top=self.popup_rect.top + 30)
         self.screen.blit(title_text, title_rect)

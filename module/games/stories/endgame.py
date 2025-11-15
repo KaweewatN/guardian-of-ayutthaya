@@ -13,15 +13,20 @@ _CONSTANT_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '
 if _CONSTANT_BASE not in sys.path:
     sys.path.insert(0, _CONSTANT_BASE)
 
-from fonts import TEXT_FONT_BOLD, BUTTON_FONT_SMALL, HINT_FONT
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from fonts import TEXT_FONT_BOLD  # noqa: F401 - retained for backward compatibility
+from ui.settings_button import SettingsButton
 
 
 class EndGameSequence:
     """Play a short cinematic sequence before presenting restart/quit choices."""
 
     POPUP_FADE_DURATION = 600  # milliseconds
-    FRAME_FADE_DURATION = 600
-    FRAME_HOLD_DURATION = 1800
+    FRAME_FADE_DURATION = 900
+    FRAME_HOLD_DURATION = 2400
 
     def __init__(self, screen: pygame.Surface, outcome: str,
                  colors: Optional[Dict[str, Tuple[int, int, int]]] = None) -> None:
@@ -57,16 +62,6 @@ class EndGameSequence:
         self.button_height = 60
         self.button_spacing = 30
 
-        self.title_font = TEXT_FONT_BOLD
-        self.button_font = BUTTON_FONT_SMALL
-        self.hint_font = HINT_FONT
-
-        self.popup_color = (240, 230, 220)
-        self.popup_border_color = (90, 60, 30)
-        self.button_color = (139, 90, 43)
-        self.button_hover_color = (180, 120, 60)
-        self.button_border_color = (90, 60, 30)
-
         self.popup_rect = pygame.Rect(0, 0, self.popup_width, self.popup_height)
         self.restart_button_rect = pygame.Rect(0, 0, self.button_width, self.button_height)
         self.quit_button_rect = pygame.Rect(0, 0, self.button_width, self.button_height)
@@ -77,6 +72,12 @@ class EndGameSequence:
 
         self.result_reported = False
         self._last_screen_size = self.screen_rect.size
+
+        self.settings_popup = SettingsButton(
+            self.screen,
+            popup_title="start this journey again?"
+        )
+        self.settings_popup.popup_visible = False
 
     # ------------------------------------------------------------------
     # Loading & layout helpers
@@ -158,6 +159,11 @@ class EndGameSequence:
         if self.final_frame is not None and self.frames:
             self.final_frame = self.frames[-1]
         self._recompute_layout()
+        try:
+            self.settings_popup.screen = self.screen
+            self.settings_popup._recompute_positions()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Sequence progression
@@ -179,6 +185,9 @@ class EndGameSequence:
         self.overlay_alpha = 0
         self.restart_hover = False
         self.quit_hover = False
+        self.settings_popup.popup_visible = True
+        self.settings_popup.quit_button_hover = False
+        self.settings_popup.restart_button_hover = False
 
     # ------------------------------------------------------------------
     # Public API expected by BoardBlock
@@ -219,12 +228,12 @@ class EndGameSequence:
                     if progress >= 1.0:
                         self._advance_to_next_frame()
 
-        elif self.state == 'popup' and self.popup_start_time is not None:
-            now = pygame.time.get_ticks()
-            elapsed = now - self.popup_start_time
-            progress = min(1.0, elapsed / self.POPUP_FADE_DURATION)
-            self.popup_alpha = int(progress * 255)
-            self.overlay_alpha = int(progress * 180)
+        elif self.state == 'popup':
+            try:
+                self.settings_popup.screen = self.screen
+                self.settings_popup._recompute_positions()
+            except Exception:
+                pass
 
     def draw(self) -> None:
         if self.state == 'sequence':
@@ -250,122 +259,42 @@ class EndGameSequence:
             rect = base_frame.get_rect(center=self.screen_rect.center)
             self.screen.blit(base_frame, rect)
 
-        if self.overlay_alpha > 0:
-            overlay = pygame.Surface(self.screen_rect.size, pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, self.overlay_alpha))
-            self.screen.blit(overlay, (0, 0))
-
-        if self.popup_alpha <= 0:
-            return
-
-        popup_surface = pygame.Surface((self.popup_rect.width, self.popup_rect.height), pygame.SRCALPHA)
-        popup_rect = popup_surface.get_rect()
-        pygame.draw.rect(
-            popup_surface,
-            (*self.popup_color, self.popup_alpha),
-            popup_rect,
-            border_radius=20,
-        )
-        pygame.draw.rect(
-            popup_surface,
-            (*self.popup_border_color, self.popup_alpha),
-            popup_rect,
-            width=4,
-            border_radius=20,
-        )
-        self.screen.blit(popup_surface, self.popup_rect)
-
-        # Title text
-        title_text = self.title_font.render("start the journey again?", True, (60, 40, 20))
-        title_text = title_text.copy()
-        title_text.set_alpha(self.popup_alpha)
-        title_rect = title_text.get_rect(centerx=self.popup_rect.centerx,
-                                         top=self.popup_rect.top + 30)
-        self.screen.blit(title_text, title_rect)
-
-        self._draw_buttons()
-
-        hint_text = self.hint_font.render("Press ESC or click outside to close", True, (100, 100, 100))
-        hint_text = hint_text.copy()
-        hint_text.set_alpha(self.popup_alpha)
-        hint_rect = hint_text.get_rect(centerx=self.popup_rect.centerx,
-                                       bottom=self.popup_rect.bottom - 10)
-        self.screen.blit(hint_text, hint_rect)
-
-    def _draw_buttons(self) -> None:
-        restart_surface = pygame.Surface((self.button_width, self.button_height), pygame.SRCALPHA)
-        restart_rect = restart_surface.get_rect()
-        restart_bg = self.button_hover_color if self.restart_hover else self.button_color
-        pygame.draw.rect(
-            restart_surface,
-            (*restart_bg, self.popup_alpha),
-            restart_rect,
-            border_radius=10,
-        )
-        pygame.draw.rect(
-            restart_surface,
-            (*self.button_border_color, self.popup_alpha),
-            restart_rect,
-            width=3,
-            border_radius=10,
-        )
-        self.screen.blit(restart_surface, self.restart_button_rect)
-
-        restart_text = self.button_font.render("Restart", True, (255, 255, 255))
-        restart_text = restart_text.copy()
-        restart_text.set_alpha(self.popup_alpha)
-        restart_text_rect = restart_text.get_rect(center=self.restart_button_rect.center)
-        self.screen.blit(restart_text, restart_text_rect)
-
-        quit_surface = pygame.Surface((self.button_width, self.button_height), pygame.SRCALPHA)
-        quit_rect = quit_surface.get_rect()
-        quit_bg = self.button_hover_color if self.quit_hover else self.button_color
-        pygame.draw.rect(
-            quit_surface,
-            (*quit_bg, self.popup_alpha),
-            quit_rect,
-            border_radius=10,
-        )
-        pygame.draw.rect(
-            quit_surface,
-            (*self.button_border_color, self.popup_alpha),
-            quit_rect,
-            width=3,
-            border_radius=10,
-        )
-        self.screen.blit(quit_surface, self.quit_button_rect)
-
-        quit_text = self.button_font.render("Quit", True, (255, 255, 255))
-        quit_text = quit_text.copy()
-        quit_text.set_alpha(self.popup_alpha)
-        quit_text_rect = quit_text.get_rect(center=self.quit_button_rect.center)
-        self.screen.blit(quit_text, quit_text_rect)
+        if self.settings_popup.popup_visible:
+            self.settings_popup.draw_popup()
 
     # ------------------------------------------------------------------
     # Event handling
     # ------------------------------------------------------------------
     def handle_event(self, event: pygame.event.Event) -> Optional[dict]:
-        if self.state != 'popup' or self.popup_alpha < 200:
+        if self.state == 'sequence':
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                self._skip_to_next_frame()
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                self._skip_to_next_frame()
             return None
 
-        if event.type == pygame.MOUSEMOTION:
-            self.restart_hover = self.restart_button_rect.collidepoint(event.pos)
-            self.quit_hover = self.quit_button_rect.collidepoint(event.pos)
+        if self.state != 'popup':
             return None
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.restart_button_rect.collidepoint(event.pos):
-                return self._finalize('restart')
-            if self.quit_button_rect.collidepoint(event.pos) or not self.popup_rect.collidepoint(event.pos):
-                return self._finalize('quit')
-            return None
+        result = self.settings_popup.handle_event(event)
+        if result in {'quit', 'restart'}:
+            return self._finalize(result)
 
-        if event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                return self._finalize('restart')
-            if event.key == pygame.K_ESCAPE:
-                return self._finalize('quit')
+        if not self.settings_popup.popup_visible:
+            self.settings_popup.popup_visible = True
+            return self._finalize('quit')
         return None
+
+    def _skip_to_next_frame(self) -> None:
+        if self.state != 'sequence':
+            return
+        if not self.frames:
+            self._begin_popup()
+            return
+        if self.current_frame_index >= len(self.frames) - 1:
+            self._begin_popup()
+            return
+        self._advance_to_next_frame()
 
     def _finalize(self, choice: str) -> Optional[dict]:
         if self.result_reported:
