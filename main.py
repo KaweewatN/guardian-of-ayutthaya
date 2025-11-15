@@ -161,7 +161,16 @@ class Game:
                     # Tutorial finished, go to board
                     self.game_state = "board"
             elif self.game_state == "board":
-                if self.board.handle_event(event):
+                board_result = self.board.handle_event(event)
+                if isinstance(board_result, dict):
+                    if board_result.get('result') == 'endgame-choice':
+                        choice = board_result.get('choice')
+                        if choice == 'restart':
+                            self.restart_game()
+                        elif choice == 'quit':
+                            self.running = False
+                        return
+                elif board_result:
                     # Launch the rock-paper-scissors mini-game (blocking until finished)
                     # Use block number 17
                     self.run_rock_paper_scissors(17)

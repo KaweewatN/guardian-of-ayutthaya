@@ -47,12 +47,12 @@ except Exception as exc:  # pragma: no cover - fallback when unavailable
     AlphabetWin = None  # type: ignore
     AlphabetLose = None  # type: ignore
 
-# Load game outcome screen
+# Load endgame cinematic
 try:
-    from game_outcome import GameOutcomeScreen
+    from stories.endgame import EndGameSequence
 except Exception as exc:  # pragma: no cover
-    print(f"Warning: GameOutcomeScreen unavailable: {exc}")
-    GameOutcomeScreen = None  # type: ignore
+    print(f"Warning: EndGameSequence unavailable: {exc}")
+    EndGameSequence = None  # type: ignore
 
 # Load event classes using direct imports (faster than importlib)
 # Add each event subdirectory to sys.path to avoid name conflicts with stdlib
@@ -202,6 +202,7 @@ class BoardBlock:
         self.playing_game = False
         self.game_completed = False
         self.final_outcome = None
+        self.pending_endgame_outcome = None
 
         # Define game event blocks
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
@@ -687,9 +688,32 @@ class BoardBlock:
             label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
             self.start_jump_animation(self.current_block, jump_destination, label)
             return
-        
+
         # No jump, so check for game events
         self.check_and_start_game_event()
+        self._maybe_trigger_endgame()
+
+    def _maybe_trigger_endgame(self):
+        """Start the endgame cinematic once all other interactions are finished."""
+        if self.pending_endgame_outcome is None:
+            return
+
+        if self.game_completed and EndGameSequence and isinstance(self.current_game, EndGameSequence):
+            return
+
+        if (
+            self.viewing_scenes
+            or self.pending_scenes
+            or self.playing_game
+            or self.current_game is not None
+            or self.is_transitioning
+            or self.active_animation
+        ):
+            return
+
+        outcome = self.pending_endgame_outcome
+        self.pending_endgame_outcome = None
+        self._show_game_outcome(outcome)
     
     def check_and_start_game_event(self):
         """
@@ -802,25 +826,25 @@ class BoardBlock:
                             self._check_for_alphabet_completion()
                     else:
                         print(f"Random Card: Already at boundary, staying at block {self.current_block}")
-                return False
+                return self._finalize_follow_up(False)
             if effect_type == 'good':
                 print("Random Card: Good card - gain letters")
                 follow_up_started = self._start_alphabet_reward(source='random')
-                return follow_up_started
+                return self._finalize_follow_up(follow_up_started)
             if effect_type == 'bad':
                 print("Random Card: Bad card - return a letter")
                 follow_up_started = self._start_alphabet_return()
-                return follow_up_started
-            return False
+                return self._finalize_follow_up(follow_up_started)
+            return self._finalize_follow_up(False)
 
         if finished_game and AlphabetWin and isinstance(finished_game, AlphabetWin):
             self._check_for_alphabet_completion()
-            return False
+            return self._finalize_follow_up(False)
         if finished_game and AlphabetLose and isinstance(finished_game, AlphabetLose):
             self._check_for_alphabet_completion()
-            return False
-        if finished_game and GameOutcomeScreen and isinstance(finished_game, GameOutcomeScreen):
-            return False
+            return self._finalize_follow_up(False)
+        if finished_game and EndGameSequence and isinstance(finished_game, EndGameSequence):
+            return self._finalize_follow_up(False)
 
         result_flag = result.get('result') if isinstance(result, dict) else None
         success_flag = result.get('success') if isinstance(result, dict) else None
@@ -830,33 +854,59 @@ class BoardBlock:
         if result_flag in ('win',) or success_flag is True:
             print(f"DEBUG: Calling _start_alphabet_reward for win/success")
             follow_up_started = self._start_alphabet_reward(source='event')
-            return follow_up_started
+            return self._finalize_follow_up(follow_up_started)
 
         if result_flag in ('alphabet-win', 'alphabet-lose'):
             self._check_for_alphabet_completion()
-            return False
+            return self._finalize_follow_up(False)
 
         if result_flag == 'game-finished':
             self.final_outcome = result.get('outcome')
             self.game_completed = True
-            return False
+            return self._finalize_follow_up(False)
 
-        return False
+        if result_flag == 'endgame-choice':
+            choice = result.get('choice')
+            self.final_outcome = result.get('outcome', self.final_outcome)
+            self.game_completed = True
+            if choice in ('restart', 'quit'):
+                return self._finalize_follow_up({
+                    'result': 'endgame-choice',
+                    'choice': choice,
+                    'outcome': self.final_outcome,
+                })
+            return self._finalize_follow_up(False)
+
+        return self._finalize_follow_up(False)
+
+    def _finalize_follow_up(self, value):
+        self._maybe_trigger_endgame()
+        return value
 
     def _check_for_alphabet_completion(self):
-        if self.game_completed:
+        if self.game_completed and not self.pending_endgame_outcome:
             return
         if self.current_block == 60:
             outcome = 'win' if game_state.has_ayutthaya_letters() else 'lose'
-            self._show_game_outcome(outcome)
+            self.pending_endgame_outcome = outcome
+            self._maybe_trigger_endgame()
 
     def _show_game_outcome(self, outcome):
-        if GameOutcomeScreen is None:
-            print(f"Game ended with {outcome.upper()}, but GameOutcomeScreen unavailable")
+        self.pending_endgame_outcome = None
+        if EndGameSequence is None:
+            print(f"Game ended with {outcome.upper()}, but EndGameSequence unavailable")
             self.game_completed = True
             self.final_outcome = outcome
             return
-        self.current_game = GameOutcomeScreen(self.screen, outcome)
+        colors = {'BLACK': (0, 0, 0), 'WHITE': (255, 255, 255)}
+        try:
+            self.current_game = EndGameSequence(self.screen, outcome, colors=colors)
+        except Exception as exc:
+            print(f"Warning: EndGameSequence failed to start: {exc}")
+            self.current_game = None
+            self.game_completed = True
+            self.final_outcome = outcome
+            return
         self.playing_game = True
         self.game_completed = True
         self.final_outcome = outcome
@@ -897,6 +947,8 @@ class BoardBlock:
         if self.playing_game and self.current_game:
             if hasattr(self.current_game, 'update'):
                 self.current_game.update()
+
+        self._maybe_trigger_endgame()
 
     def _update_movement_animation(self):
         """Progress the active movement animation."""
@@ -1300,7 +1352,9 @@ class BoardBlock:
                 self.playing_game = False
                 self.current_game = None
 
-                self._handle_mini_game_result(result, finished_game)
+                follow_up = self._handle_mini_game_result(result, finished_game)
+                if isinstance(follow_up, dict):
+                    return follow_up
             return None
         
         # If viewing scenes, forward events to scene viewer

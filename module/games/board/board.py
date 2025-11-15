@@ -274,8 +274,7 @@ class Board:
             if not self.dice.is_active() and (board_ready or self.board_block.viewing_scenes or self.board_block.playing_game):
                 result = self.board_block.handle_event(event)
                 if result:
-                    # Handle block movement results if needed
-                    pass
+                    return result
             return None
 
         # No active mini-game and in buttons mode: handle button interactions

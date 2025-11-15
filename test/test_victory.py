@@ -10,7 +10,7 @@ import os
 # Add module paths
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from module.games.board.game_outcome import GameOutcomeScreen
+from module.games.stories.endgame import EndGameSequence
 
 def test_victory_page():
     """Test victory page display"""
@@ -20,13 +20,13 @@ def test_victory_page():
     clock = pygame.time.Clock()
     
     # Create victory screen
-    outcome_screen = GameOutcomeScreen(screen, 'win')
+    outcome_screen = EndGameSequence(screen, 'win')
     
     print("=" * 60)
     print("Displaying Victory Page")
     print("=" * 60)
-    print("Press SPACE or click to close")
-    print("Press ESC to exit")
+    print("Press SPACE or ENTER to restart")
+    print("Press ESC to quit the game")
     print("=" * 60)
     
     running = True
@@ -62,13 +62,13 @@ def test_defeat_page():
     clock = pygame.time.Clock()
     
     # Create defeat screen
-    outcome_screen = GameOutcomeScreen(screen, 'lose')
+    outcome_screen = EndGameSequence(screen, 'lose')
     
     print("=" * 60)
     print("Displaying Defeat Page")
     print("=" * 60)
-    print("Press SPACE or click to close")
-    print("Press ESC to exit")
+    print("Press SPACE or ENTER to restart")
+    print("Press ESC to quit the game")
     print("=" * 60)
     
     running = True
