@@ -6,6 +6,7 @@ Used when player lands on a block to show story scenes
 import pygame
 import os
 import sys
+import json
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..'))
@@ -18,7 +19,7 @@ class SceneViewer:
     Automatically transitions between scenes with a timer.
     """
     
-    def __init__(self, screen, scenes_list, scene_duration=5000):
+    def __init__(self, screen, scenes_list, block_number=1, scene_duration=5000):
         """
         Initialize scene viewer.
         
@@ -26,11 +27,16 @@ class SceneViewer:
             screen: Pygame display surface
             scenes_list: List of scene dictionaries from block_scenes_config
                         Each dict has: {'folder': str, 'filename': str, 'type': str}
+            block_number: Current block number for displaying place name
             scene_duration: Duration in milliseconds to show each scene (default: 5000 = 5 seconds)
         """
         self.screen = screen
         self.screen_width = screen.get_width()
         self.screen_height = screen.get_height()
+        
+        # Block and place info
+        self.block_number = block_number
+        self.place_names = self.load_place_names()
         
         # Scene data
         self.scenes_list = scenes_list
@@ -54,6 +60,16 @@ class SceneViewer:
         
         # Smaller font for UI text
         self.small_font = TEXT_FONT
+    
+    def load_place_names(self):
+        """Load place names from place.json file."""
+        place_file = os.path.join(os.path.dirname(__file__), 'place.json')
+        try:
+            with open(place_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load place.json: {e}")
+            return {}
     
     def load_scenes(self):
         """Load all scene images from assets/scene folder."""
@@ -147,12 +163,14 @@ class SceneViewer:
     
     def draw_ui(self):
         """Draw navigation UI elements."""
-        # Scene counter (top right) - smaller text
-        # counter_text = f"Scene {self.current_scene_index + 1} / {self.total_scenes}"
-        # counter_surf = self.small_font.render(counter_text, True, (255, 255, 255))
-        # counter_rect = counter_surf.get_rect()
-        # counter_rect.topright = (self.screen_width - 20, 10)
-        # self.screen.blit(counter_surf, counter_rect)
+        # Place name (top right with margin)
+        place_name = self.place_names.get(str(self.block_number), "Unknown Place")
+        place_text = f"Block {self.block_number}: {place_name}"
+        place_surf = self.small_font.render(place_text, True, (255, 255, 255))
+        place_rect = place_surf.get_rect()
+        place_rect.topright = (self.screen_width - 30, 20)  # 30px margin from top and right
+        
+        self.screen.blit(place_surf, place_rect)
         
         # Keystroke instructions (center bottom) - smaller text, no background
         instructions = "Press SPACE or ENTER to continue"

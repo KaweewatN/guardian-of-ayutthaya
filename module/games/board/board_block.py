@@ -4,6 +4,7 @@ Creates a 6x5 grid (30 blocks on board 1, continuing to board 2)
 Manages block positions and character movement between blocks
 """
 import importlib.util
+import json
 import math
 import os
 import sys
@@ -160,6 +161,9 @@ class BoardBlock:
         # Current block position (1-indexed)
         self.current_block = start_block
         
+        # Load place names from place.json
+        self.place_names = self.load_place_names()
+        
         # Load board images
         self.board_images = {}
         self.load_board_images()
@@ -222,6 +226,16 @@ class BoardBlock:
 
         # Mark as fully loaded after initialization
         self.is_fully_loaded = True
+    
+    def load_place_names(self):
+        """Load place names from place.json file."""
+        place_file = os.path.join(os.path.dirname(__file__), 'place.json')
+        try:
+            with open(place_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load place.json: {e}")
+            return {}
         
     def load_board_images(self):
         """Load board-block-1 and board-block-2 from assets/core folder."""
@@ -657,7 +671,7 @@ class BoardBlock:
     def start_pending_scenes(self):
         """Actually start showing the scenes after the delay."""
         if self.cached_scenes:
-            self.scene_viewer = SceneViewer(self.screen, self.cached_scenes, scene_duration=5000)
+            self.scene_viewer = SceneViewer(self.screen, self.cached_scenes, block_number=self.current_block, scene_duration=5000)
             self.viewing_scenes = True
             self.pending_scenes = False
             self.cached_scenes = None
@@ -1181,7 +1195,7 @@ class BoardBlock:
         self.draw_block_info()
     
     def draw_block_info(self):
-        """Draw current block number above the board-block."""
+        """Draw current block number and place name above the board-block."""
         # Use centralized font system
         font = TEXT_FONT_BOLD
 
@@ -1190,8 +1204,11 @@ class BoardBlock:
         board_x, board_y = self.get_board_top_left()
         offset_x = self._current_board_offsets.get(reference_board, 0)
 
+        # Get place name for current block
+        place_name = self.place_names.get(str(self.current_block), "Unknown Place")
+        
         info_text = f"Board {self.get_viewed_board()} of {self.total_boards}"
-        info_text += f"  •  Block: {self.current_block}"
+        info_text += f"  •  Block {self.current_block}: {place_name}"
         text_surf = font.render(info_text, True, (0, 0, 0))
 
         text_rect = text_surf.get_rect()

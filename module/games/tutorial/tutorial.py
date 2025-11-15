@@ -102,12 +102,12 @@ class Tutorial:
             self.background = None
     
     def load_page_images(self):
-        """Load images for each tutorial page (1.png to 10.png)"""
+        """Load images for each tutorial page (1.png to 11.png)"""
         base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
         tutorial_assets = os.path.join(base_path, 'assets', 'tutorial')
         
-        # Try to load images 1.png through 10.png
-        for i in range(1, 11):
+        # Try to load images 1.png through 11.png
+        for i in range(1, 12):
             img_path = os.path.join(tutorial_assets, f'{i}.png')
             if os.path.exists(img_path):
                 try:
@@ -165,12 +165,13 @@ class Tutorial:
             {
                 "title": "Event Types",
                 "content": [
-                    "You'll encounter 4 types of events on special blocks:",
+                    "You'll encounter 5 types of events on special blocks:",
                     "",
                     "1. Math Challenge - Solve math problems correctly",
                     "2. Rock-Paper-Scissors - Win the classic game",
                     "3. Guess Game - Answer questions about Brain teasers",
-                    "4. Random Card - Draw a card for random effects",
+                    "4. Photo Hunt - Find differences between two images",
+                    "5. Random Card - Draw a card for random effects",
                     "",
                     "Complete events to continue your journey!",
                 ],
@@ -179,8 +180,6 @@ class Tutorial:
             {
                 "title": "Math Challenge",
                 "content": [
-                    "Blocks: 3, 11, 20, 28, 37, 43, 49, 54",
-                    "",
                     "• Solve addition, subtraction, multiplication, or division",
                     "• Type your answer and submit",
                     "• Get it right to continue!",
@@ -191,8 +190,6 @@ class Tutorial:
             {
                 "title": "Rock-Paper-Scissors",
                 "content": [
-                    "Blocks: 6, 17, 40, 46, 57",
-                    "",
                     "• Classic game: Rock beats Scissors, Scissors beats Paper,",
                     "  Paper beats Rock",
                     "• Choose your move wisely",
@@ -203,18 +200,24 @@ class Tutorial:
             {
                 "title": "Guess Game",
                 "content": [
-                    "Blocks: 9, 14, 31, 51",
-                    "",
                     "• Answer questions about Brain teasers",
                     "• Type your answer",
                 ],
                 "icon": "guess"
             },
             {
+                "title": "Photo Hunt",
+                "content": [
+                    "• Find the differences between two similar images",
+                    "• Click on the differences you spot",
+                    "• Find all differences to win!",
+                    "• Pay close attention to details",
+                ],
+                "icon": "photo-hunt"
+            },
+            {
                 "title": "Random Card",
                 "content": [
-                    "Blocks: 4, 8, 12, 16, 19, 23, 26, 29, 33, 36, 39, 43, 45, 48, 52, 56",
-                    "",
                     "• Draw one card from three face-down cards",
                     "  - Good Card: Positive effect",
                     "  - Bad Card: Negative effect", 
