@@ -91,7 +91,6 @@ def get_block_jump_destination(block_number, from_jump=False):
         32: 47,  # Block 32 -> 47
         38: 42,  # Block 38 -> 42
         50: 58,  # Block 50 -> 58
-        53: 58   # Block 53 -> 58
     }
     
     # Backward jumps (snakes/traps that move you back)
