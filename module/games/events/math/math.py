@@ -164,7 +164,7 @@ class MathEvent:
         self.number_tiles = self._create_number_tiles(self.number_choices)
 
         # Countdown tracking
-        self.countdown_total_ms = 20000
+        self.countdown_total_ms = 25000
         self.countdown_start_ticks: Optional[int] = None
 
         # Instruction text surface reused for intro/result screens
