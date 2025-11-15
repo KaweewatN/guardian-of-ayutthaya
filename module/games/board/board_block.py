@@ -7,12 +7,12 @@ import importlib.util
 import math
 import os
 import sys
-from typing import Optional
 
 import pygame
 
 from block_scenes_config import get_block_scene_sequence, get_block_jump_destination
 from scene_viewer import SceneViewer
+from event_image_preloader import EventImagePreloader
 
 # Add module directory to path for game_state import
 _MODULE_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -30,11 +30,14 @@ from fonts import TEXT_FONT_BOLD
 
 
 _EVENTS_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'events'))
+if _EVENTS_BASE not in sys.path:
+    sys.path.append(_EVENTS_BASE)
 
 _ALPHABET_BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'alphabet'))
 if _ALPHABET_BASE not in sys.path:
     sys.path.insert(0, _ALPHABET_BASE)
 
+# Load alphabet screens
 try:  # pragma: no cover - runtime dependency
     from alphabet_win import AlphabetWin
     from alphabet_lose import AlphabetLose
@@ -43,52 +46,69 @@ except Exception as exc:  # pragma: no cover - fallback when unavailable
     AlphabetWin = None  # type: ignore
     AlphabetLose = None  # type: ignore
 
+# Load game outcome screen
 try:
     from game_outcome import GameOutcomeScreen
 except Exception as exc:  # pragma: no cover
     print(f"Warning: GameOutcomeScreen unavailable: {exc}")
     GameOutcomeScreen = None  # type: ignore
 
+# Load event classes using direct imports (faster than importlib)
+# Add each event subdirectory to sys.path to avoid name conflicts with stdlib
+# Cache loaded modules to avoid reloading
+_EVENT_CLASS_CACHE = {}
 
-def _load_event_class(module_name: str, relative_path: str, class_name: str) -> Optional[type]:
-    """Safely load an event class without colliding with stdlib modules."""
-    if _EVENTS_BASE not in sys.path:
-        # Append instead of inserting at front to avoid shadowing stdlib names like random
-        sys.path.append(_EVENTS_BASE)
-
-    module_path = os.path.join(_EVENTS_BASE, *relative_path.split('/'))
-    if not os.path.exists(module_path):
-        print(f"Warning: Event module not found at {module_path}")
+def _load_event_module_once(module_name, file_path):
+    """Load a module from file path, with caching to prevent reloads."""
+    if module_name in _EVENT_CLASS_CACHE:
+        return _EVENT_CLASS_CACHE[module_name]
+    
+    if not os.path.exists(file_path):
         return None
-
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    if not spec or not spec.loader:
-        print(f"Warning: Unable to load spec for {module_name}")
-        return None
-
-    module = importlib.util.module_from_spec(spec)
+    
     try:
+        spec = importlib.util.spec_from_file_location(module_name, file_path)
+        if not spec or not spec.loader:
+            return None
+        
+        module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    except Exception as exc:  # pragma: no cover - runtime guard
-        print(f"Warning: Failed to import {module_name}: {exc}")
+        _EVENT_CLASS_CACHE[module_name] = module
+        return module
+    except Exception as exc:
+        print(f"Warning: Failed to load {module_name}: {exc}")
         return None
 
-    cls = getattr(module, class_name, None)
-    if cls is None:
-        print(f"Warning: {class_name} not found in {module_name}")
-        return None
+MathEvent = None
+RockPaperScissors = None
+GuessGame = None
+PhotoHuntGame = None
+RandomCard = None
 
-    return cls
+# Math Event
+math_module = _load_event_module_once('math_event', os.path.join(_EVENTS_BASE, 'math', 'math.py'))
+if math_module:
+    MathEvent = getattr(math_module, 'MathEvent', None)
 
+# Rock Paper Scissors
+rps_module = _load_event_module_once('rps_event', os.path.join(_EVENTS_BASE, 'rock_paper_scissors', 'rock_paper_scissors.py'))
+if rps_module:
+    RockPaperScissors = getattr(rps_module, 'RockPaperScissors', None)
 
-MathEvent = _load_event_class('events.math.math', 'math/math.py', 'MathEvent')
-RockPaperScissors = _load_event_class(
-    'events.rock_paper_scissors.rock_paper_scissors',
-    'rock_paper_scissors/rock_paper_scissors.py',
-    'RockPaperScissors'
-)
-GuessGame = _load_event_class('events.guess.guess', 'guess/guess.py', 'GuessGame')
-RandomCard = _load_event_class('random.random_event', 'random/random_event.py', 'RandomCard')
+# Guess Game
+guess_module = _load_event_module_once('guess_event', os.path.join(_EVENTS_BASE, 'guess', 'guess.py'))
+if guess_module:
+    GuessGame = getattr(guess_module, 'GuessGame', None)
+
+# Photo Hunt
+photo_module = _load_event_module_once('photo_hunt_event', os.path.join(_EVENTS_BASE, 'photo-hunt', 'photo_hunt.py'))
+if photo_module:
+    PhotoHuntGame = getattr(photo_module, 'PhotoHuntGame', None)
+
+# Random Card
+random_module = _load_event_module_once('random_card_event', os.path.join(_EVENTS_BASE, 'random', 'random_event.py'))
+if random_module:
+    RandomCard = getattr(random_module, 'RandomCard', None)
 
 
 class BoardBlock:
@@ -103,6 +123,7 @@ class BoardBlock:
     - Math Game: Blocks 3, 11, 20, 28, 37, 43, 49, 54
     - Rock Paper Scissors: Blocks 6, 17, 40, 46, 57
     - Guess Game: Blocks 9, 14, 31, 51
+    - Photo Hunt: Blocks 22, 34
     """
     
     # Board configuration
@@ -111,6 +132,14 @@ class BoardBlock:
     COLS = 6
     ROWS = 5
     BLOCKS_PER_BOARD = COLS * ROWS  # 30 blocks
+    
+    # Shared image preloader (class variable, loaded once for all instances)
+    _image_preloader = None
+    
+    @classmethod
+    def get_image_preloader(cls):
+        """Get the shared image preloader instance."""
+        return cls._image_preloader
     
     def __init__(self, screen, start_block=1):
         """
@@ -160,7 +189,7 @@ class BoardBlock:
         self.scene_viewer = None
         self.viewing_scenes = False
         self.scene_delay_timer = 0
-        self.scene_delay_duration = 5000  # 5 second delay before showing scenes (in milliseconds)
+        self.scene_delay_duration = 1000 
         self.pending_scenes = False
         self.cached_scenes = None
 
@@ -174,6 +203,7 @@ class BoardBlock:
         self.math_blocks = [3, 11, 20, 28, 37, 43, 49, 54]
         self.rps_blocks = [6, 17, 25, 40, 46, 57]
         self.guess_blocks = [9, 14, 31, 51]
+        self.photo_hunt_blocks = [22, 34]
         self.random_blocks = [4, 8, 12, 16, 19, 23, 26, 33, 36, 39, 42, 45, 48, 52, 56]
 
         # Movement animation state
@@ -181,6 +211,11 @@ class BoardBlock:
         self.animation_duration = 260  # milliseconds per tile when animating
         self.floating_text = None
         self.wrap_effect = None
+
+        # Initialize image preloader (once per class, shared across all instances)
+        if BoardBlock._image_preloader is None:
+            BoardBlock._image_preloader = EventImagePreloader(screen)
+            BoardBlock._image_preloader.preload_all_events()
 
         # Show scenes for the starting block
         self.show_block_scenes()
@@ -509,16 +544,9 @@ class BoardBlock:
                 self.current_block = next_block
                 self.update_character_position()
                 
-                # Only check for special block jumps when this is the final landing (show_scenes=True)
-                # This ensures jumps only trigger when you land exactly on the block, not when passing through
+                # Show scenes for the new block
+                # Jumps will be checked AFTER scenes finish in _check_post_scene_actions()
                 if show_scenes:
-                    jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
-                    if jump_destination:
-                        label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
-                        self.start_jump_animation(self.current_block, jump_destination, label)
-                        return True
-
-                    # Show scenes for the new block when there's no jump
                     self.show_block_scenes()
 
                 # Unlock state after transition when no jump animation started
@@ -558,16 +586,9 @@ class BoardBlock:
                 self.current_block = prev_block
                 self.update_character_position()
                 
-                # Only check for special block jumps when this is the final landing (show_scenes=True)
-                # This ensures jumps only trigger when you land exactly on the block, not when passing through
+                # Show scenes for the new block
+                # Jumps will be checked AFTER scenes finish in _check_post_scene_actions()
                 if show_scenes:
-                    jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
-                    if jump_destination:
-                        label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
-                        self.start_jump_animation(self.current_block, jump_destination, label)
-                        return True
-
-                    # Show scenes for the new block when there's no jump
                     self.show_block_scenes()
 
                 # Unlock state after transition when no jump animation started
@@ -641,6 +662,21 @@ class BoardBlock:
             self.pending_scenes = False
             self.cached_scenes = None
     
+    def _check_post_scene_actions(self):
+        """
+        Check what to do after scenes finish.
+        Priority: 1) Jumps, 2) Game events, 3) End game check
+        """
+        # First check for jumps
+        jump_destination = get_block_jump_destination(self.current_block, from_jump=False)
+        if jump_destination:
+            label = "Ladder!" if jump_destination > self.current_block else "Trunk!"
+            self.start_jump_animation(self.current_block, jump_destination, label)
+            return
+        
+        # No jump, so check for game events
+        self.check_and_start_game_event()
+    
     def check_and_start_game_event(self):
         """
         Check if current block triggers a game event and start it.
@@ -651,7 +687,7 @@ class BoardBlock:
         - Starting games during scene viewing or transitions
         
         Called from:
-        1. update() - When scenes finish automatically (timer-based)
+        1. _check_post_scene_actions() - After scenes finish
         2. handle_event() - When scenes are skipped by user input
         """
         if self.game_completed:
@@ -700,6 +736,15 @@ class BoardBlock:
             print(f"Starting Guess game at block {self.current_block}")
             self.current_game = GuessGame(self.screen, self.current_block)
             self.playing_game = True
+            return
+
+        if self.current_block in self.photo_hunt_blocks:
+            if PhotoHuntGame is None:
+                print(f"Warning: PhotoHuntGame unavailable for block {self.current_block}")
+                return
+            print(f"Starting Photo Hunt game at block {self.current_block}")
+            self.current_game = PhotoHuntGame(self.screen, self.current_block)
+            self.playing_game = True
 
     def _start_alphabet_reward(self, source='event'):
         if AlphabetWin is None:
@@ -719,6 +764,8 @@ class BoardBlock:
 
     def _handle_mini_game_result(self, result, finished_game=None):
         follow_up_started = False
+        
+        print(f"DEBUG: _handle_mini_game_result called with result={result}, finished_game={type(finished_game).__name__ if finished_game else None}")
 
         effect = result.get('effect') if isinstance(result, dict) else None
         if effect:
@@ -763,8 +810,11 @@ class BoardBlock:
 
         result_flag = result.get('result') if isinstance(result, dict) else None
         success_flag = result.get('success') if isinstance(result, dict) else None
+        
+        print(f"DEBUG: result_flag={result_flag}, success_flag={success_flag}")
 
         if result_flag in ('win',) or success_flag is True:
+            print(f"DEBUG: Calling _start_alphabet_reward for win/success")
             follow_up_started = self._start_alphabet_reward(source='event')
             return follow_up_started
 
@@ -826,9 +876,8 @@ class BoardBlock:
             if self.scene_viewer.is_finished:
                 self.viewing_scenes = False
                 self.scene_viewer = None
-                # After scenes finish automatically, check if we should start a game event
-                # Note: If finished by user input, this is handled in handle_event()
-                self.check_and_start_game_event()
+                # After scenes finish, check for jumps first, then game events
+                self._check_post_scene_actions()
         
         # Update game if playing
         if self.playing_game and self.current_game:
@@ -1243,9 +1292,8 @@ class BoardBlock:
             if finished:
                 self.viewing_scenes = False
                 self.scene_viewer = None
-                # Important: Check and start game event immediately after scenes finish
-                # This ensures games start properly even when scenes are skipped via input
-                self.check_and_start_game_event()
+                # After scenes finish (skipped by user), check for jumps then game events
+                self._check_post_scene_actions()
             return None
         
         # Block input during transitions or pending scenes

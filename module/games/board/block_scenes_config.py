@@ -86,20 +86,21 @@ def get_block_jump_destination(block_number, from_jump=False):
     
     # Forward jumps (ladders/portals that move you ahead)
     forward_jumps = {
-        3: 6,
-        27: 35,
-        32: 47,
-        38: 42,
-        50: 58
+        2: 6,    # Block 2 -> 6
+        27: 35,  # Block 27 -> 35
+        32: 47,  # Block 32 -> 47
+        38: 42,  # Block 38 -> 42
+        50: 58,  # Block 50 -> 58
+        53: 58   # Block 53 -> 58
     }
     
     # Backward jumps (snakes/traps that move you back)
     backward_jumps = {
-        13: 8,
-        21: 16,
-        30: 23,
-        44: 37,
-        55: 49
+        13: 8,   # Block 13 -> 8
+        21: 16,  # Block 21 -> 16
+        30: 23,  # Block 30 -> 23
+        44: 37,  # Block 44 -> 37
+        55: 49   # Block 55 -> 49
     }
     
     # Check forward jumps first

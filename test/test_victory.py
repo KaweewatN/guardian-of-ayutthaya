@@ -1,6 +1,6 @@
 """
-Quick test for Victory/Outcome page
-ทดสอบหน้าชนะ/แพ้อย่างเดียว
+Quick test for Victory / Outcome page
+Tests the win/lose screen independently
 """
 
 import pygame
@@ -16,17 +16,17 @@ def test_victory_page():
     """Test victory page display"""
     pygame.init()
     screen = pygame.display.set_mode((1280, 832))
-    pygame.display.set_caption("Test Victory Page - กด SPACE เพื่อปิด")
+    pygame.display.set_caption("Test Victory Page - Press SPACE to close")
     clock = pygame.time.Clock()
     
     # Create victory screen
     outcome_screen = GameOutcomeScreen(screen, 'win')
     
     print("=" * 60)
-    print("กำลังแสดงหน้าชนะ (Victory Page)")
+    print("Displaying Victory Page")
     print("=" * 60)
-    print("กด SPACE หรือคลิกเมาส์เพื่อปิด")
-    print("กด ESC เพื่อออก")
+    print("Press SPACE or click to close")
+    print("Press ESC to exit")
     print("=" * 60)
     
     running = True
@@ -58,17 +58,17 @@ def test_defeat_page():
     """Test defeat page display"""
     pygame.init()
     screen = pygame.display.set_mode((1280, 832))
-    pygame.display.set_caption("Test Defeat Page - กด SPACE เพื่อปิด")
+    pygame.display.set_caption("Test Defeat Page - Press SPACE to close")
     clock = pygame.time.Clock()
     
     # Create defeat screen
     outcome_screen = GameOutcomeScreen(screen, 'lose')
     
     print("=" * 60)
-    print("กำลังแสดงหน้าแพ้ (Defeat Page)")
+    print("Displaying Defeat Page")
     print("=" * 60)
-    print("กด SPACE หรือคลิกเมาส์เพื่อปิด")
-    print("กด ESC เพื่อออก")
+    print("Press SPACE or click to close")
+    print("Press ESC to exit")
     print("=" * 60)
     
     running = True
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         test_victory_page()
     
     print("\n" + "=" * 60)
-    print("วิธีใช้:")
-    print("  python3 test/test_victory_page.py       - ทดสอบหน้าชนะ")
-    print("  python3 test/test_victory_page.py lose  - ทดสอบหน้าแพ้")
+    print("Usage:")
+    print("  python3 test/test_victory_page.py       - Test victory page")
+    print("  python3 test/test_victory_page.py lose  - Test defeat page")
     print("=" * 60)
