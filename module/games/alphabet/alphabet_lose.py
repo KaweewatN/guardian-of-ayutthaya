@@ -52,15 +52,14 @@ class AlphabetLose:
         self.state: str = 'selecting' if self.has_cards else 'no-cards'
 
         self._compute_layout()
-        self.base_letter_images: dict[str, pygame.Surface] = {}
-        self.letter_images: dict[str, pygame.Surface] = self._load_letter_images()
-        self.return_image = self._load_return_image()
-
         self.text_font = TEXT_FONT
         self.button_font = BUTTON_FONT
 
         info_color = (210, 180, 120)
         confirm_color = (245, 230, 190)
+
+        self.base_letter_images: dict[str, pygame.Surface] = {}
+        self.letter_images: dict[str, pygame.Surface] = self._load_letter_images()
 
         if self.has_cards:
             message = "Select one card to return to the deck"
@@ -74,6 +73,10 @@ class AlphabetLose:
 
         self.prompt_surface = self.text_font.render(
             "Press SPACE or CLICK to continue", True, (255, 255, 255)
+        )
+
+        self.confirm_instruction_surface = self.text_font.render(
+            "to the deck", True, confirm_color
         )
 
         self.confirm_text_color = (255, 240, 210)
@@ -123,25 +126,6 @@ class AlphabetLose:
             images[letter] = pygame.transform.smoothscale(original, (width, height))
 
         return images
-
-    def _load_return_image(self) -> Optional[pygame.Surface]:
-        path = self._assets_path('return.png')
-        if os.path.exists(path):
-            try:
-                image = pygame.image.load(path).convert_alpha()
-                max_width = int(self.screen_rect.width * 0.6)
-                max_height = int(self.screen_rect.height * 0.7)
-                width, height = image.get_size()
-                if width > max_width or height > max_height:
-                    scale = min(max_width / width, max_height / height)
-                    new_size = (max(1, int(width * scale)), max(1, int(height * scale)))
-                    image = pygame.transform.smoothscale(image, new_size)
-                return image
-            except Exception as exc:  # pragma: no cover
-                print(f"Warning: unable to load return card image {path}: {exc}")
-        else:
-            print(f"Warning: return card artwork missing: {path}")
-        return None
 
     # ------------------------------------------------------------------
     # Layout helpers
@@ -372,26 +356,39 @@ class AlphabetLose:
             pygame.draw.rect(self.screen, selected_color, rect.inflate(16, 16), width=5, border_radius=12)
 
     def _draw_confirm_view(self) -> None:
-        message = f"Return A{self.selected_letter} back to deck"
+        letter = (self.selected_letter or "?").upper()
+        message = f"Return {letter}"
         message_surface = self.button_font.render(message, True, self.confirm_text_color)
-        message_rect = message_surface.get_rect(center=(self.screen_rect.centerx, 150))
+
+        frame_width = max(260, min(self.screen_rect.width - 140, int(self.screen_rect.width * 0.7)))
+        frame_height = max(220, min(self.screen_rect.height - 200, int(self.screen_rect.height * 0.55)))
+        confirm_rect = pygame.Rect(0, 0, frame_width, frame_height)
+        confirm_rect.center = (self.screen_rect.centerx, self.screen_rect.centery + 20)
+
+        frame_surface = pygame.Surface(confirm_rect.size, pygame.SRCALPHA)
+        frame_surface.fill((40, 24, 12, 235))
+        pygame.draw.rect(frame_surface, (255, 221, 142), frame_surface.get_rect(), width=4, border_radius=18)
+        inner_rect = frame_surface.get_rect().inflate(-24, -24)
+        pygame.draw.rect(frame_surface, (70, 50, 35), inner_rect, border_radius=14)
+
+        self.screen.blit(frame_surface, confirm_rect.topleft)
+
+        message_rect = message_surface.get_rect(center=(self.screen_rect.centerx, confirm_rect.top + 45))
         self.screen.blit(message_surface, message_rect)
 
-        if self.return_image:
-            return_rect = self.return_image.get_rect(center=self.screen_rect.center)
-            self.screen.blit(self.return_image, return_rect)
-        else:
-            return_rect = pygame.Rect(0, 0, int(self.screen_rect.width * 0.45), int(self.screen_rect.height * 0.42))
-            return_rect.center = self.screen_rect.center
-            pygame.draw.rect(self.screen, (70, 50, 35), return_rect, border_radius=18)
-            pygame.draw.rect(self.screen, (255, 221, 142), return_rect, width=4, border_radius=18)
+        confirm_hint_rect = self.confirm_instruction_surface.get_rect(
+            center=(self.screen_rect.centerx, confirm_rect.bottom - 40)
+        )
+        self.screen.blit(self.confirm_instruction_surface, confirm_hint_rect)
 
         if self.selected_letter:
-            max_width = max(1, int(return_rect.width * 0.38))
-            max_height = max(1, int(return_rect.height * 0.55))
+            max_width = max(1, int(inner_rect.width * 0.4))
+            max_height = max(1, int(inner_rect.height * 0.6))
             card_image = self._get_scaled_letter_image(self.selected_letter, max_width, max_height)
             if card_image:
-                card_rect = card_image.get_rect(center=return_rect.center)
+                card_rect = card_image.get_rect()
+                inner_rect_global = inner_rect.move(confirm_rect.topleft)
+                card_rect.center = inner_rect_global.center
                 self.screen.blit(card_image, card_rect)
 
     def _get_scaled_letter_image(self, letter: str, max_width: int, max_height: int) -> Optional[pygame.Surface]:
