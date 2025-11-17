@@ -1,1 +1,6 @@
-pygame>=2.1.0
+# Guardian of Ayutthaya - Game Requirements
+# Main game engine
+pygame>=2.6.0
+
+# Note: The following are Python standard library modules (no installation needed):
+# - sys, os, json, random, math, importlib, typing
