@@ -209,8 +209,7 @@ class Tutorial:
                 "title": "Photo Hunt",
                 "content": [
                     "• Find the differences between two similar images",
-                    "• Click on the differences you spot",
-                    "• Find all differences to win!",
+                    "• Click on one of the differences you spot to win",
                     "• Pay close attention to details",
                 ],
                 "icon": "photo-hunt"
