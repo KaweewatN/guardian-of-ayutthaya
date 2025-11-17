@@ -164,10 +164,13 @@ class Game:
                 board_result = self.board.handle_event(event)
                 if isinstance(board_result, dict):
                     if board_result.get('result') == 'endgame-choice':
-                        choice = board_result.get('choice')
+                        choice = board_result.get('choice') or 'quit'
                         if choice == 'restart':
                             self.restart_game()
                         elif choice == 'quit':
+                            self.running = False
+                        else:
+                            # Default to quitting if an unexpected choice is returned
                             self.running = False
                         return
                 elif board_result:
@@ -358,9 +361,11 @@ class Game:
         while self.running:
             self.clock.tick(FPS)
             self.handle_events()
+            if not self.running:
+                break
             self.update()
             self.draw()
-            
+
         self.quit()
     
     def restart_game(self):

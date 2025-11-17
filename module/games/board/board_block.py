@@ -866,16 +866,14 @@ class BoardBlock:
             return self._finalize_follow_up(False)
 
         if result_flag == 'endgame-choice':
-            choice = result.get('choice')
+            choice = result.get('choice') or 'quit'
             self.final_outcome = result.get('outcome', self.final_outcome)
             self.game_completed = True
-            if choice in ('restart', 'quit'):
-                return self._finalize_follow_up({
-                    'result': 'endgame-choice',
-                    'choice': choice,
-                    'outcome': self.final_outcome,
-                })
-            return self._finalize_follow_up(False)
+            return self._finalize_follow_up({
+                'result': 'endgame-choice',
+                'choice': choice,
+                'outcome': self.final_outcome,
+            })
 
         return self._finalize_follow_up(False)
 
